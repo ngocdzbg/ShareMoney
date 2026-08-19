@@ -1,10 +1,10 @@
 package com.ngocnb.sharemoney.service.Impl;
 
-
 import com.ngocnb.sharemoney.dto.request.ExpenseCreateRequest;
 import com.ngocnb.sharemoney.dto.request.ExpenseUpdateRequest;
 import com.ngocnb.sharemoney.dto.response.ExpenseResponse;
 import com.ngocnb.sharemoney.entity.Expense;
+import com.ngocnb.sharemoney.entity.ExpenseParticipant;
 import com.ngocnb.sharemoney.entity.Group;
 import com.ngocnb.sharemoney.entity.User;
 import com.ngocnb.sharemoney.exception.ResourceNotFoundException;
@@ -21,11 +21,16 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional(readOnly = true)
 public class ExpenseServiceImpl implements ExpenseService {
+
     private final ExpenseRepository expenseRepository;
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
@@ -34,7 +39,14 @@ public class ExpenseServiceImpl implements ExpenseService {
      * Lấy danh sách expense có phân trang và sắp xếp.
      */
     @Override
-    public Page<ExpenseResponse> getAllExpenses(int page, int size, String sortBy, String direction) {
+    @Transactional(readOnly = true)
+    public Page<ExpenseResponse> getAllExpenses(
+            int page,
+            int size,
+            String sortBy,
+            String direction
+    ) {
+
         log.debug(
                 "Fetching expenses - page: {}, size: {}, sortBy: {}, direction: {}",
                 page,
@@ -93,14 +105,18 @@ public class ExpenseServiceImpl implements ExpenseService {
      * Lấy expense theo ID.
      */
     @Override
+    @Transactional(readOnly = true)
     public ExpenseResponse getExpenseById(Long id) {
+
         log.debug("Fetching expense with id: {}", id);
 
         Expense expense = expenseRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Expense not found with id: {}", id);
 
-                    return new ResourceNotFoundException("Expense với ID " + id + " không tồn tại");
+                    return new ResourceNotFoundException(
+                            "Expense với ID " + id + " không tồn tại"
+                    );
                 });
 
         return convertToResponse(expense);
@@ -111,29 +127,77 @@ public class ExpenseServiceImpl implements ExpenseService {
      */
     @Override
     @Transactional
-    public ExpenseResponse createExpense(ExpenseCreateRequest request) {
-        log.debug("Creating expense: {}", request.getDescription());
+    public ExpenseResponse createExpense(
+            ExpenseCreateRequest request
+    ) {
 
-        Group group = groupRepository.findById(request.getGroupId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Group với ID " + request.getGroupId() + " không tồn tại")
-                );
+        log.debug(
+                "Creating expense: {}",
+                request.getDescription()
+        );
 
-        User user = userRepository.findById(request.getPaidBy())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("User với ID " + request.getPaidBy() + " không tồn tại")
-                );
+        /*
+         * 1. Kiểm tra Group
+         */
+        Group group = groupRepository.findById(
+                request.getGroupId()
+        ).orElseThrow(() ->
+                new ResourceNotFoundException(
+                        "Group với ID "
+                                + request.getGroupId()
+                                + " không tồn tại"
+                )
+        );
 
+        /*
+         * 2. Kiểm tra người trả tiền
+         */
+        User paidBy = userRepository.findById(
+                request.getPaidBy()
+        ).orElseThrow(() ->
+                new ResourceNotFoundException(
+                        "User với ID "
+                                + request.getPaidBy()
+                                + " không tồn tại"
+                )
+        );
+
+        /*
+         * 3. Kiểm tra danh sách participants
+         */
+        if (request.getParticipantIds() == null
+                || request.getParticipantIds().isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "Expense phải có ít nhất một người tham gia"
+            );
+        }
+
+        /*
+         * 4. Tạo Expense
+         */
         Expense expense = Expense.builder()
                 .group(group)
                 .description(request.getDescription())
                 .amount(request.getAmount())
                 .expenseDate(request.getExpenseDate())
-                .paidBy(user)
+                .paidBy(paidBy)
+                .participants(new ArrayList<>())
                 .build();
 
+        /*
+         * 5. Lưu Expense trước để có ID
+         */
         Expense savedExpense =
                 expenseRepository.save(expense);
+
+        /*
+         * 6. Tạo ExpenseParticipant
+         */
+        createParticipants(
+                savedExpense,
+                request.getParticipantIds()
+        );
 
         log.info(
                 "Expense created successfully - id: {}, description: {}, amount: {}",
@@ -146,54 +210,181 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     /**
-     * Cập nhật expense.
+     * Cập nhật Expense bằng PATCH.
      */
     @Override
     @Transactional
-    public ExpenseResponse updateExpense(Long id, ExpenseUpdateRequest request) {
+    public ExpenseResponse updateExpense(
+            Long id,
+            ExpenseUpdateRequest request
+    ) {
         log.debug("Updating expense with id: {}", id);
 
         Expense expense = expenseRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Expense not found with id: {} for update", id);
 
-                    return new ResourceNotFoundException("Expense với ID " + id + " không tồn tại");
+                    return new ResourceNotFoundException(
+                            "Expense với ID " + id + " không tồn tại"
+                    );
                 });
 
+        /*
+         * Kiểm tra amount có thay đổi không.
+         */
+        boolean amountChanged = request.getAmount() != null
+                && request.getAmount().compareTo(expense.getAmount()) != 0;
+
+        /*
+         * Kiểm tra participantIds có được gửi lên không.
+         *
+         * null  -> không thay đổi participants
+         * khác null -> thay đổi participants
+         */
+        boolean participantsChanged =
+                request.getParticipantIds() != null;
+
+        /*
+         * Update group
+         */
         if (request.getGroupId() != null) {
-            Group group = groupRepository.findById(request.getGroupId())
-                    .orElseThrow(() ->
-                            new ResourceNotFoundException("Group với ID " + request.getGroupId() + " không tồn tại")
-                    );
+
+            Group group = groupRepository.findById(
+                    request.getGroupId()
+            ).orElseThrow(() ->
+                    new ResourceNotFoundException(
+                            "Group với ID "
+                                    + request.getGroupId()
+                                    + " không tồn tại"
+                    )
+            );
 
             expense.setGroup(group);
+
+            log.debug(
+                    "Expense {} group changed to {}",
+                    id,
+                    request.getGroupId()
+            );
         }
 
+        /*
+         * Update description
+         */
         if (request.getDescription() != null) {
-            expense.setDescription(request.getDescription());
+            expense.setDescription(
+                    request.getDescription()
+            );
         }
 
-        if (request.getAmount() != null) {
-            expense.setAmount(request.getAmount());
+        /*
+         * Update amount
+         */
+        if (amountChanged) {
+
+            log.debug(
+                    "Expense {} amount changed from {} to {}",
+                    id,
+                    expense.getAmount(),
+                    request.getAmount()
+            );
+
+            expense.setAmount(
+                    request.getAmount()
+            );
         }
 
+        /*
+         * Update expense date
+         */
         if (request.getExpenseDate() != null) {
-            expense.setExpenseDate(request.getExpenseDate());
+            expense.setExpenseDate(
+                    request.getExpenseDate()
+            );
         }
 
+        /*
+         * Update paidBy
+         */
         if (request.getPaidBy() != null) {
 
-            User user = userRepository.findById(request.getPaidBy())
-                    .orElseThrow(() ->
-                            new ResourceNotFoundException("User với ID " + request.getPaidBy() + " không tồn tại")
-                    );
+            User paidBy = userRepository.findById(
+                    request.getPaidBy()
+            ).orElseThrow(() ->
+                    new ResourceNotFoundException(
+                            "User với ID "
+                                    + request.getPaidBy()
+                                    + " không tồn tại"
+                    )
+            );
 
-            expense.setPaidBy(user);
+            expense.setPaidBy(paidBy);
         }
 
-        Expense updatedExpense = expenseRepository.save(expense);
+        /*
+         * Nếu amount hoặc participants thay đổi
+         * thì phải tính lại shareAmount.
+         */
+        if (amountChanged || participantsChanged) {
 
-        log.info("Expense updated successfully - id: {}", updatedExpense.getId());
+            /*
+             * Nếu request có participantIds
+             * thì dùng danh sách mới.
+             *
+             * Nếu chỉ amount thay đổi thì giữ
+             * nguyên danh sách participant hiện tại.
+             */
+            List<Long> participantIds;
+
+            if (participantsChanged) {
+
+                participantIds = request.getParticipantIds();
+
+                if (participantIds == null
+                        || participantIds.isEmpty()) {
+
+                    throw new IllegalArgumentException(
+                            "Expense phải có ít nhất một người tham gia"
+                    );
+                }
+
+            } else {
+
+                participantIds = expense.getParticipants()
+                        .stream()
+                        .map(participant ->
+                                participant.getUser().getId()
+                        )
+                        .toList();
+            }
+
+            /*
+             * Xóa participants cũ.
+             */
+            expense.getParticipants().clear();
+
+            /*
+             * Tạo lại participants với
+             * shareAmount mới.
+             */
+            createParticipants(
+                    expense,
+                    participantIds
+            );
+
+            log.debug(
+                    "Recalculated participants for expense {}",
+                    id
+            );
+        }
+
+        Expense updatedExpense =
+                expenseRepository.save(expense);
+
+        log.info(
+                "Expense updated successfully - id: {}",
+                updatedExpense.getId()
+        );
 
         return convertToResponse(updatedExpense);
     }
@@ -204,23 +395,143 @@ public class ExpenseServiceImpl implements ExpenseService {
     @Override
     @Transactional
     public void deleteExpenseById(Long id) {
+
         log.debug("Deleting expense with id: {}", id);
 
-        if (!expenseRepository.existsById(id)) {
-            log.warn("Expense not found with id: {} for deletion", id);
+        Expense expense = expenseRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.warn(
+                            "Expense not found with id: {} for deletion",
+                            id
+                    );
 
-            throw new ResourceNotFoundException("Expense với ID " + id + " không tồn tại");
-        }
+                    return new ResourceNotFoundException(
+                            "Expense với ID "
+                                    + id
+                                    + " không tồn tại"
+                    );
+                });
 
-        expenseRepository.deleteById(id);
+        expenseRepository.delete(expense);
 
-        log.info("Expense deleted successfully with id: {}", id);
+        log.info(
+                "Expense deleted successfully with id: {}",
+                id
+        );
     }
 
     /**
-     * Convert Expense Entity -> ExpenseResponse DTO.
+     * Tạo danh sách ExpenseParticipant.
      */
-    private ExpenseResponse convertToResponse(Expense expense) {
+    private void createParticipants(
+            Expense expense,
+            List<Long> participantIds
+    ) {
+
+        /*
+         * Loại bỏ ID trùng nhau.
+         *
+         * Ví dụ:
+         * [1, 2, 2, 3]
+         *
+         * sẽ thành:
+         * [1, 2, 3]
+         */
+        List<Long> uniqueParticipantIds =
+                participantIds.stream()
+                        .distinct()
+                        .toList();
+        if (uniqueParticipantIds.size() != participantIds.size()) {
+            throw new IllegalArgumentException(
+                    "participantIds không được chứa user trùng nhau"
+            );
+        }
+
+        /*
+         * Tính số tiền mỗi người phải chịu.
+         */
+        BigDecimal shareAmount =
+                expense.getAmount()
+                        .divide(
+                                BigDecimal.valueOf(
+                                        uniqueParticipantIds.size()
+                                ),
+                                2,
+                                RoundingMode.DOWN
+                        );
+
+        BigDecimal totalShare =
+                shareAmount.multiply(
+                        BigDecimal.valueOf(
+                                uniqueParticipantIds.size()
+                        )
+                );
+
+        /*
+         * Phần tiền dư do làm tròn.
+         *
+         * Ví dụ:
+         * 100 / 3
+         *
+         * mỗi người = 33.33
+         *
+         * còn dư = 0.01
+         */
+        BigDecimal remainder =
+                expense.getAmount()
+                        .subtract(totalShare);
+
+        for (int i = 0; i < uniqueParticipantIds.size(); i++) {
+
+            Long userId =
+                    uniqueParticipantIds.get(i);
+
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() ->
+                            new ResourceNotFoundException(
+                                    "User với ID "
+                                            + userId
+                                            + " không tồn tại"
+                            )
+                    );
+
+            BigDecimal finalShare =
+                    shareAmount;
+
+            /*
+             * Đưa phần tiền dư cho người cuối cùng.
+             */
+            if (i == uniqueParticipantIds.size() - 1) {
+                finalShare = finalShare.add(remainder);
+            }
+
+            ExpenseParticipant participant =
+                    ExpenseParticipant.builder()
+                            .expense(expense)
+                            .user(user)
+                            .shareAmount(finalShare)
+                            .build();
+
+            expense.getParticipants()
+                    .add(participant);
+        }
+    }
+
+    /**
+     * Convert Expense Entity -> ExpenseResponse.
+     */
+    private ExpenseResponse convertToResponse(
+            Expense expense
+    ) {
+
+        List<Long> participantIds =
+                expense.getParticipants()
+                        .stream()
+                        .map(participant ->
+                                participant.getUser().getId()
+                        )
+                        .toList();
+
         return ExpenseResponse.builder()
                 .id(expense.getId())
                 .groupId(expense.getGroup().getId())
@@ -228,6 +539,7 @@ public class ExpenseServiceImpl implements ExpenseService {
                 .amount(expense.getAmount())
                 .expenseDate(expense.getExpenseDate())
                 .paidBy(expense.getPaidBy().getId())
+                .participantIds(participantIds)
                 .build();
     }
 }

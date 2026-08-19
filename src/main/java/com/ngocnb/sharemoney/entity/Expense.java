@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "expenses")
@@ -25,7 +27,7 @@ public class Expense {
     @JoinColumn(name = "group_id", nullable = false)
     private Group group;
 
-    @Column()
+    @Column
     private String description;
 
     @Column(nullable = false, precision = 15, scale = 2)
@@ -37,4 +39,12 @@ public class Expense {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "paid_by", nullable = false)
     private User paidBy;
+
+    @OneToMany(
+            mappedBy = "expense",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    @Builder.Default
+    private List<ExpenseParticipant> participants = new ArrayList<>();
 }
