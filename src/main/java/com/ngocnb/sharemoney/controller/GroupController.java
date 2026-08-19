@@ -1,7 +1,7 @@
 package com.ngocnb.sharemoney.controller;
 
-import com.ngocnb.sharemoney.dto.request.CreateGroupRequest;
-import com.ngocnb.sharemoney.dto.request.UpdateGroupRequest;
+import com.ngocnb.sharemoney.dto.request.GroupCreateRequest;
+import com.ngocnb.sharemoney.dto.request.GroupUpdateRequest;
 import com.ngocnb.sharemoney.dto.response.GroupResponse;
 import com.ngocnb.sharemoney.service.GroupService;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,7 +29,7 @@ public class GroupController {
     private final GroupService groupService;
 
     @PostMapping()
-    public ResponseEntity<GroupResponse> createGroup(@Valid @RequestBody CreateGroupRequest request) {
+    public ResponseEntity<GroupResponse> createGroup(@Valid @RequestBody GroupCreateRequest request) {
         log.info("POST /api/groups - Create group: {}", request.getGroupName());
         GroupResponse response = groupService.createGroup(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -73,7 +73,7 @@ public class GroupController {
             @PathVariable
             @Positive(message = "Id must be greater than 0")
             Long id,
-            @Valid @RequestBody UpdateGroupRequest request
+            @Valid @RequestBody GroupUpdateRequest request
     ) {
         log.info("PUT /api/groups/{} - Update group", id);
         GroupResponse response = groupService.updateGroup(id, request);

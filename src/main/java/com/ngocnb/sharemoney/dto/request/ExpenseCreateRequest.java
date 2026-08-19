@@ -15,7 +15,6 @@ public class ExpenseCreateRequest {
     @NotNull(message = "Group ID không được để trống")
     private Long groupId;
 
-    @NotBlank(message = "Description không được để trống")
     @Size(max = 255, message = "Description không được vượt quá 255 ký tự")
     private String description;
 
