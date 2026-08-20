@@ -1,11 +1,11 @@
 package com.ngocnb.sharemoney.service.Impl;
 
-import com.ngocnb.sharemoney.dto.request.GroupCreateRequest;
-import com.ngocnb.sharemoney.dto.request.GroupUpdateRequest;
-import com.ngocnb.sharemoney.dto.response.GroupResponse;
-import com.ngocnb.sharemoney.entity.Group;
-import com.ngocnb.sharemoney.repository.GroupRepository;
-import com.ngocnb.sharemoney.service.GroupService;
+import com.ngocnb.sharemoney.dto.request.GroupNameCreateRequest;
+import com.ngocnb.sharemoney.dto.request.GroupNameUpdateRequest;
+import com.ngocnb.sharemoney.dto.response.GroupNameResponse;
+import com.ngocnb.sharemoney.entity.GroupName;
+import com.ngocnb.sharemoney.repository.GroupNameRepository;
+import com.ngocnb.sharemoney.service.GroupNameService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -21,28 +21,28 @@ import java.util.Arrays;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class GroupServiceImpl implements GroupService {
-    private final GroupRepository groupRepository;
+public class GroupNameServiceImpl implements GroupNameService {
+    private final GroupNameRepository groupNameRepository;
 
 
     @Override
     @Transactional
-    public GroupResponse createGroup(GroupCreateRequest request) {
+    public GroupNameResponse createGroup(GroupNameCreateRequest request) {
         log.debug("Creating new group: {}", request.getGroupName());
-        Group group = Group.builder()
+        GroupName group = GroupName.builder()
                 .name(request.getGroupName())
                 .build();
 
-        Group savedGroup = groupRepository.save(group);
+        GroupName savedGroup = groupNameRepository.save(group);
         log.info("Group created successfully with id: {} - name: {}", savedGroup.getId(), savedGroup.getName());
 
         return toResponse(savedGroup);
     }
 
     @Override
-    public GroupResponse getGroupById(Long id) {
+    public GroupNameResponse getGroupById(Long id) {
         log.debug("Fetching group detail with id: {}", id);
-        Group group = groupRepository.findById(id)
+        GroupName group = groupNameRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
         log.info("Group found: {}", group.getName());
         return toResponse(group);
@@ -61,7 +61,7 @@ public class GroupServiceImpl implements GroupService {
      */
     @Override
     @Transactional(readOnly = true)
-    public Page<GroupResponse> getAllGroups(
+    public Page<GroupNameResponse> getAllGroups(
             int page,
             int size,
             String sortBy,
@@ -101,8 +101,8 @@ public class GroupServiceImpl implements GroupService {
         Pageable pageable = PageRequest.of(page, size, sort);
 
         // Fetch data
-        Page<Group> groupsPage =
-                groupRepository.findAll(pageable);
+        Page<GroupName> groupsPage =
+                groupNameRepository.findAll(pageable);
 
         log.info(
                 "Found {} groups (total: {})",
@@ -115,10 +115,10 @@ public class GroupServiceImpl implements GroupService {
 
     @Override
     @Transactional
-    public GroupResponse updateGroup(Long id, GroupUpdateRequest req) {
+    public GroupNameResponse updateGroup(Long id, GroupNameUpdateRequest req) {
         log.debug("Updating group with id: {}", id);
 
-        Group group = groupRepository.findById(id)
+        GroupName group = groupNameRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Group not found with id: {} for update", id);
                     return new RuntimeException("Group not found");
@@ -128,7 +128,7 @@ public class GroupServiceImpl implements GroupService {
             group.setName(req.getGroupName());
         }
 
-        Group updatedGroup = groupRepository.save(group);
+        GroupName updatedGroup = groupNameRepository.save(group);
 
         log.info("Group updated successfully with id: {}", updatedGroup.getId());
         return toResponse(group);
@@ -137,18 +137,18 @@ public class GroupServiceImpl implements GroupService {
     @Override
     public void deleteGroup(Long id) {
         log.debug("Deleting group with id: {}", id);
-        Group group = groupRepository.findById(id)
+        GroupName group = groupNameRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Group not group with id: {} for deletion", id);
                     return new RuntimeException("Group not found");
                 });
 
-        groupRepository.delete(group);
+        groupNameRepository.delete(group);
         log.info("Group deleted successfully with id: {}", id);
     }
 
-    private GroupResponse toResponse(Group group) {
-        return GroupResponse.builder()
+    private GroupNameResponse toResponse(GroupName group) {
+        return GroupNameResponse.builder()
                 .id(group.getId())
                 .groupName(group.getName())
                 .createdAt(group.getCreatedAt())

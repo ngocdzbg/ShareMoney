@@ -25,7 +25,7 @@ public class Expense {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_id", nullable = false)
-    private Group group;
+    private GroupName group;
 
     @Column
     private String description;
@@ -38,7 +38,7 @@ public class Expense {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "paid_by", nullable = false)
-    private User paidBy;
+    private GroupMember paidBy;
 
     @OneToMany(
             mappedBy = "expense",

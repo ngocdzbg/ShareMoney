@@ -3,14 +3,11 @@ package com.ngocnb.sharemoney.service.Impl;
 import com.ngocnb.sharemoney.dto.request.ExpenseCreateRequest;
 import com.ngocnb.sharemoney.dto.request.ExpenseUpdateRequest;
 import com.ngocnb.sharemoney.dto.response.ExpenseResponse;
-import com.ngocnb.sharemoney.entity.Expense;
-import com.ngocnb.sharemoney.entity.ExpenseParticipant;
-import com.ngocnb.sharemoney.entity.Group;
-import com.ngocnb.sharemoney.entity.User;
+import com.ngocnb.sharemoney.entity.*;
 import com.ngocnb.sharemoney.exception.ResourceNotFoundException;
 import com.ngocnb.sharemoney.repository.ExpenseRepository;
-import com.ngocnb.sharemoney.repository.GroupRepository;
-import com.ngocnb.sharemoney.repository.UserRepository;
+import com.ngocnb.sharemoney.repository.GroupMemberRepository;
+import com.ngocnb.sharemoney.repository.GroupNameRepository;
 import com.ngocnb.sharemoney.service.ExpenseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,8 +29,8 @@ import java.util.List;
 public class ExpenseServiceImpl implements ExpenseService {
 
     private final ExpenseRepository expenseRepository;
-    private final GroupRepository groupRepository;
-    private final UserRepository userRepository;
+    private final GroupNameRepository groupNameRepository;
+    private final GroupMemberRepository groupMemberRepository;
 
     /**
      * Lấy danh sách expense có phân trang và sắp xếp.
@@ -139,25 +136,12 @@ public class ExpenseServiceImpl implements ExpenseService {
         /*
          * 1. Kiểm tra Group
          */
-        Group group = groupRepository.findById(
+        GroupName group = groupNameRepository.findById(
                 request.getGroupId()
         ).orElseThrow(() ->
                 new ResourceNotFoundException(
                         "Group với ID "
                                 + request.getGroupId()
-                                + " không tồn tại"
-                )
-        );
-
-        /*
-         * 2. Kiểm tra người trả tiền
-         */
-        User paidBy = userRepository.findById(
-                request.getPaidBy()
-        ).orElseThrow(() ->
-                new ResourceNotFoundException(
-                        "User với ID "
-                                + request.getPaidBy()
                                 + " không tồn tại"
                 )
         );
@@ -181,7 +165,7 @@ public class ExpenseServiceImpl implements ExpenseService {
                 .description(request.getDescription())
                 .amount(request.getAmount())
                 .expenseDate(request.getExpenseDate())
-                .paidBy(paidBy)
+                .paidBy(request.getPaidBy())
                 .participants(new ArrayList<>())
                 .build();
 
@@ -249,7 +233,7 @@ public class ExpenseServiceImpl implements ExpenseService {
          */
         if (request.getGroupId() != null) {
 
-            Group group = groupRepository.findById(
+            GroupName group = groupNameRepository.findById(
                     request.getGroupId()
             ).orElseThrow(() ->
                     new ResourceNotFoundException(
@@ -307,18 +291,7 @@ public class ExpenseServiceImpl implements ExpenseService {
          * Update paidBy
          */
         if (request.getPaidBy() != null) {
-
-            User paidBy = userRepository.findById(
-                    request.getPaidBy()
-            ).orElseThrow(() ->
-                    new ResourceNotFoundException(
-                            "User với ID "
-                                    + request.getPaidBy()
-                                    + " không tồn tại"
-                    )
-            );
-
-            expense.setPaidBy(paidBy);
+            expense.setPaidBy(request.getPaidBy());
         }
 
         /*
@@ -349,12 +322,9 @@ public class ExpenseServiceImpl implements ExpenseService {
                 }
 
             } else {
-
                 participantIds = expense.getParticipants()
                         .stream()
-                        .map(participant ->
-                                participant.getUser().getId()
-                        )
+                        .map(participant -> participant.getGroupMember().getId())
                         .toList();
             }
 
@@ -429,26 +399,40 @@ public class ExpenseServiceImpl implements ExpenseService {
     ) {
 
         /*
-         * Loại bỏ ID trùng nhau.
+         * Kiểm tra ID trùng nhau.
          *
          * Ví dụ:
          * [1, 2, 2, 3]
          *
-         * sẽ thành:
-         * [1, 2, 3]
+         * sẽ bị reject.
          */
         List<Long> uniqueParticipantIds =
                 participantIds.stream()
                         .distinct()
                         .toList();
+
         if (uniqueParticipantIds.size() != participantIds.size()) {
             throw new IllegalArgumentException(
-                    "participantIds không được chứa user trùng nhau"
+                    "participantIds không được chứa GroupMember trùng nhau"
+            );
+        }
+
+        /*
+         * Expense bắt buộc phải thuộc một Group.
+         */
+        if (expense.getGroup() == null) {
+            throw new IllegalStateException(
+                    "Expense chưa có Group"
             );
         }
 
         /*
          * Tính số tiền mỗi người phải chịu.
+         *
+         * Ví dụ:
+         * 100 / 3
+         *
+         * shareAmount = 33.33
          */
         BigDecimal shareAmount =
                 expense.getAmount()
@@ -460,6 +444,9 @@ public class ExpenseServiceImpl implements ExpenseService {
                                 RoundingMode.DOWN
                         );
 
+        /*
+         * Tính tổng tiền sau khi chia.
+         */
         BigDecimal totalShare =
                 shareAmount.multiply(
                         BigDecimal.valueOf(
@@ -473,9 +460,9 @@ public class ExpenseServiceImpl implements ExpenseService {
          * Ví dụ:
          * 100 / 3
          *
-         * mỗi người = 33.33
+         * 33.33 * 3 = 99.99
          *
-         * còn dư = 0.01
+         * remainder = 0.01
          */
         BigDecimal remainder =
                 expense.getAmount()
@@ -483,32 +470,51 @@ public class ExpenseServiceImpl implements ExpenseService {
 
         for (int i = 0; i < uniqueParticipantIds.size(); i++) {
 
-            Long userId =
+            Long groupMemberId =
                     uniqueParticipantIds.get(i);
 
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() ->
-                            new ResourceNotFoundException(
-                                    "User với ID "
-                                            + userId
-                                            + " không tồn tại"
-                            )
-                    );
+            /*
+             * Tìm GroupMember.
+             */
+            GroupMember groupMember =
+                    groupMemberRepository.findById(groupMemberId)
+                            .orElseThrow(() ->
+                                    new ResourceNotFoundException(
+                                            "GroupMember với ID "
+                                                    + groupMemberId
+                                                    + " không tồn tại"
+                                    )
+                            );
 
+            /*
+             * GroupMember phải thuộc Group
+             * của Expense.
+             */
+            if (!groupMember.getGroup().getId()
+                    .equals(expense.getGroup().getId())) {
+
+                throw new IllegalArgumentException(
+                        "GroupMember với ID "
+                                + groupMemberId
+                                + " không thuộc Group của Expense"
+                );
+            }
+
+            /*
+             * Người cuối cùng nhận phần tiền dư.
+             */
             BigDecimal finalShare =
                     shareAmount;
 
-            /*
-             * Đưa phần tiền dư cho người cuối cùng.
-             */
             if (i == uniqueParticipantIds.size() - 1) {
-                finalShare = finalShare.add(remainder);
+                finalShare =
+                        finalShare.add(remainder);
             }
 
             ExpenseParticipant participant =
                     ExpenseParticipant.builder()
                             .expense(expense)
-                            .user(user)
+                            .groupMember(groupMember)
                             .shareAmount(finalShare)
                             .build();
 
@@ -528,7 +534,7 @@ public class ExpenseServiceImpl implements ExpenseService {
                 expense.getParticipants()
                         .stream()
                         .map(participant ->
-                                participant.getUser().getId()
+                                participant.getGroupMember().getId()
                         )
                         .toList();
 

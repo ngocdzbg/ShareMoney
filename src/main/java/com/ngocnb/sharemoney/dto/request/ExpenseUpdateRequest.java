@@ -1,5 +1,6 @@
 package com.ngocnb.sharemoney.dto.request;
 
+import com.ngocnb.sharemoney.entity.GroupMember;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -27,7 +28,7 @@ public class ExpenseUpdateRequest {
 
     private LocalDate expenseDate;
 
-    private Long paidBy;
+    private GroupMember paidBy;
 
     private List<Long> participantIds;
 }

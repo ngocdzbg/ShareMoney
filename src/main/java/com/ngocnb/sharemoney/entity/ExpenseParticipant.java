@@ -13,8 +13,11 @@ import java.math.BigDecimal;
         name = "expense_participants",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_expense_participant",
-                        columnNames = {"expense_id", "user_id"}
+                        name = "uk_expense_group_member",
+                        columnNames = {
+                                "expense_id",
+                                "group_member_id"
+                        }
                 )
         }
 )
@@ -23,6 +26,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ExpenseParticipant {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -32,8 +36,9 @@ public class ExpenseParticipant {
     private Expense expense;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @JoinColumn(name = "group_member_id", nullable = false)
+    private GroupMember groupMember;
 
+    @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal shareAmount;
 }

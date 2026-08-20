@@ -1,12 +1,13 @@
 package com.ngocnb.sharemoney.config;
 
 import com.ngocnb.sharemoney.entity.Fruit;
+import com.ngocnb.sharemoney.entity.GroupName;
 import com.ngocnb.sharemoney.entity.User;
 import com.ngocnb.sharemoney.repository.FruitRepository;
+import com.ngocnb.sharemoney.repository.GroupNameRepository;
 import com.ngocnb.sharemoney.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,16 +22,16 @@ import java.util.List;
 public class DataInitializationConfig implements CommandLineRunner {
 
     private final FruitRepository fruitRepository;
-
     private final UserRepository userRepository;
-
     private final PasswordEncoder passwordEncoder;
+    private final GroupNameRepository groupNameRepository;
 
     /**
      * Initialize fruit data on application startup
      */
     @Override
     public void run(String... args) throws Exception {
+        // ACCOUNT
         log.info("========================================");
         log.info("  INITIALIZING ADMIN USER");
         log.info("========================================");
@@ -78,10 +79,42 @@ public class DataInitializationConfig implements CommandLineRunner {
         log.info("========================================");
 
 
+        // GROUP
+        log.info("========================================");
+        log.info("  INITIALIZING GROUPNAME   ");
+        log.info("========================================");
+        // Check if database already has Group
+        long existingGroupCount = groupNameRepository.count();
+        if (existingGroupCount > 0) {
+            log.info("✓ Database already has {} groups. Skipping initialization.", existingGroupCount);
+            return;
+        }
+
+        log.info("Database is empty. Adding 3 sample groups...");
+
+        List<GroupName> groupNames = Arrays.asList(
+                GroupName.builder()
+                        .name("Ăn ốc")
+                        .build(),
+
+                GroupName.builder()
+                        .name("Ăn chè")
+                        .build(),
+
+                GroupName.builder()
+                        .name("Ăn nướng")
+                        .build()
+        );
+
+        groupNameRepository.saveAll(groupNames);
+        log.info("✓ Successfully added {} groupNames to database", groupNames.size());
+        log.info("========================================");
+
+
+        // FRUIT
         log.info("========================================");
         log.info("  INITIALIZING FRUIT DATABASE DATA");
         log.info("========================================");
-
 
         // Check if database already has data
         long existingCount = fruitRepository.count();

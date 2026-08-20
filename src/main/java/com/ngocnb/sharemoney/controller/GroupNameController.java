@@ -1,9 +1,9 @@
 package com.ngocnb.sharemoney.controller;
 
-import com.ngocnb.sharemoney.dto.request.GroupCreateRequest;
-import com.ngocnb.sharemoney.dto.request.GroupUpdateRequest;
-import com.ngocnb.sharemoney.dto.response.GroupResponse;
-import com.ngocnb.sharemoney.service.GroupService;
+import com.ngocnb.sharemoney.dto.request.GroupNameCreateRequest;
+import com.ngocnb.sharemoney.dto.request.GroupNameUpdateRequest;
+import com.ngocnb.sharemoney.dto.response.GroupNameResponse;
+import com.ngocnb.sharemoney.service.GroupNameService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,31 +24,31 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @Tag(name = "Group Management", description = "API để quản lý group")
 @SecurityRequirement(name = "Bearer Authentication")
-public class GroupController {
+public class GroupNameController {
 
-    private final GroupService groupService;
+    private final GroupNameService groupNameService;
 
     @PostMapping()
-    public ResponseEntity<GroupResponse> createGroup(@Valid @RequestBody GroupCreateRequest request) {
+    public ResponseEntity<GroupNameResponse> createGroup(@Valid @RequestBody GroupNameCreateRequest request) {
         log.info("POST /api/groups - Create group: {}", request.getGroupName());
-        GroupResponse response = groupService.createGroup(request);
+        GroupNameResponse response = groupNameService.createGroup(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<GroupResponse> getGroupById(
+    public ResponseEntity<GroupNameResponse> getGroupById(
             @PathVariable
             @Positive(message = "Id must be greater than 0")
             Long id
     ) {
         log.info("GET /api/groups/{}", id);
-        GroupResponse response = groupService.getGroupById(id);
+        GroupNameResponse response = groupNameService.getGroupById(id);
 
         return ResponseEntity.ok(response);
     }
 
     @GetMapping
-    public ResponseEntity<Page<GroupResponse>> getAllGroups(
+    public ResponseEntity<Page<GroupNameResponse>> getAllGroups(
             @Parameter(description = "Số trang (zero-based, mặc định 0)")
             @RequestParam(defaultValue = "0") int page,
 
@@ -63,20 +63,20 @@ public class GroupController {
 
         log.info("GET /api/groups - page: {}, size: {}, sortBy: {}, direction: {}",
                 page, size, sortBy, direction);
-        Page<GroupResponse> groups = groupService.getAllGroups(page, size, sortBy, direction);
+        Page<GroupNameResponse> groups = groupNameService.getAllGroups(page, size, sortBy, direction);
 
         return ResponseEntity.ok(groups);
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<GroupResponse> updateGroup(
+    public ResponseEntity<GroupNameResponse> updateGroup(
             @PathVariable
             @Positive(message = "Id must be greater than 0")
             Long id,
-            @Valid @RequestBody GroupUpdateRequest request
+            @Valid @RequestBody GroupNameUpdateRequest request
     ) {
         log.info("PUT /api/groups/{} - Update group", id);
-        GroupResponse response = groupService.updateGroup(id, request);
+        GroupNameResponse response = groupNameService.updateGroup(id, request);
 
         return ResponseEntity.ok(response);
     }
@@ -88,7 +88,7 @@ public class GroupController {
             Long id
     ) {
         log.info("DELETE /api/groups/{} - Delete group", id);
-        groupService.deleteGroup(id);
+        groupNameService.deleteGroup(id);
 
         return ResponseEntity.noContent().build();
     }

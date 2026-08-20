@@ -1,5 +1,6 @@
 package com.ngocnb.sharemoney.dto.request;
 
+import com.ngocnb.sharemoney.entity.GroupMember;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
@@ -24,7 +25,7 @@ public class ExpenseCreateRequest {
     private LocalDate expenseDate;
 
     @NotNull(message = "Paid by không được để trống")
-    private Long paidBy;
+    private GroupMember paidBy;
 
     @NotEmpty(message = "Phải có ít nhất một người tham gia")
     private List<Long> participantIds;

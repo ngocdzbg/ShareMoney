@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 @Data
 @Builder
-public class GroupResponse {
+public class GroupNameResponse {
     private Long id;
     private String groupName;
     private LocalDateTime createdAt;

@@ -7,15 +7,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.Date;
 
 @Entity
-@Table(name = "group_name")
+@Table(name = "group_names")
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class Group {
+public class GroupName {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
