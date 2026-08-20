@@ -1,32 +1,37 @@
 package com.ngocnb.sharemoney.dto.request;
 
-import com.ngocnb.sharemoney.entity.GroupMember;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ExpenseCreateRequest {
 
-    @NotNull(message = "Group ID không được để trống")
-    private Long groupId;
-
-    @NotBlank(message = "Description không được để trống")
+    @NotBlank(message = "Mô tả khoản chi không được để trống")
     private String description;
 
-    @NotNull(message = "Amount không được để trống")
-    @DecimalMin(value = "0.01")
+    @NotNull(message = "Số tiền không được để trống")
+    @DecimalMin(value = "0.01", message = "Số tiền phải lớn hơn 0")
     private BigDecimal amount;
 
-    @NotNull(message = "Expense date không được để trống")
+    @NotNull(message = "Ngày chi tiêu không được để trống")
     private LocalDate expenseDate;
 
-    @NotNull(message = "Paid by không được để trống")
-    private GroupMember paidBy;
+    @NotNull(message = "ID người trả tiền không được để trống")
+    private Long paidById;
 
-    @NotEmpty(message = "Phải có ít nhất một người tham gia")
-    private List<Long> participantIds;
+    @NotEmpty(message = "Danh sách người tham gia chia tiền không được để trống")
+    private List<Long> participantIds; // ID các GroupMember tham gia chia khoản này
 }

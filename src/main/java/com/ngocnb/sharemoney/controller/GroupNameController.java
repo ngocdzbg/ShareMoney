@@ -4,6 +4,7 @@ import com.ngocnb.sharemoney.dto.request.GroupNameCreateRequest;
 import com.ngocnb.sharemoney.dto.request.GroupNameUpdateRequest;
 import com.ngocnb.sharemoney.dto.response.GroupNameResponse;
 import com.ngocnb.sharemoney.service.GroupNameService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,13 +29,21 @@ public class GroupNameController {
 
     private final GroupNameService groupNameService;
 
-    @PostMapping()
+    @Operation(
+            summary = "Tạo nhóm thu chi mới",
+            description = "Tạo một nhóm thu chi mới trong hệ thống bằng cách cung cấp tên nhóm."
+    )
+    @PostMapping
     public ResponseEntity<GroupNameResponse> createGroup(@Valid @RequestBody GroupNameCreateRequest request) {
         log.info("POST /api/groups - Create group: {}", request.getGroupName());
         GroupNameResponse response = groupNameService.createGroup(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @Operation(
+            summary = "Lấy thông tin chi tiết nhóm",
+            description = "Truy vấn thông tin chi tiết của một nhóm thu chi dựa trên ID của nhóm."
+    )
     @GetMapping("/{id}")
     public ResponseEntity<GroupNameResponse> getGroupById(
             @PathVariable
@@ -47,6 +56,10 @@ public class GroupNameController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(
+            summary = "Lấy danh sách tất cả các nhóm (Phân trang)",
+            description = "Trả về danh sách tất cả các nhóm thu chi trong hệ thống, có hỗ trợ phân trang (page, size) và sắp xếp (sortBy, direction)."
+    )
     @GetMapping
     public ResponseEntity<Page<GroupNameResponse>> getAllGroups(
             @Parameter(description = "Số trang (zero-based, mặc định 0)")
@@ -68,6 +81,10 @@ public class GroupNameController {
         return ResponseEntity.ok(groups);
     }
 
+    @Operation(
+            summary = "Cập nhật thông tin nhóm",
+            description = "Cập nhật tên hoặc thông tin của một nhóm thu chi theo ID chỉ định."
+    )
     @PatchMapping("/{id}")
     public ResponseEntity<GroupNameResponse> updateGroup(
             @PathVariable
@@ -81,6 +98,10 @@ public class GroupNameController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(
+            summary = "Xóa nhóm thu chi",
+            description = "Xóa hoàn toàn một nhóm thu chi khỏi hệ thống dựa theo ID chỉ định."
+    )
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteGroup(
             @PathVariable

@@ -21,11 +21,11 @@ public class Settlement {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "from_user", nullable = false)
-    private User fromUser;
+    private GroupMember fromUser;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "to_user", nullable = false)
-    private User toUser;
+    private GroupMember toUser;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_id", nullable = false)

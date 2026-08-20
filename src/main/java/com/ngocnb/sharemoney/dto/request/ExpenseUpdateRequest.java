@@ -1,34 +1,37 @@
 package com.ngocnb.sharemoney.dto.request;
 
-import com.ngocnb.sharemoney.entity.GroupMember;
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ExpenseUpdateRequest {
 
-    private Long groupId;
-
-    @Size(
-            max = 255,
-            message = "Description không được vượt quá 255 ký tự"
-    )
+    @NotBlank(message = "Mô tả khoản chi không được để trống")
     private String description;
 
-    @DecimalMin(
-            value = "0.01",
-            message = "Amount phải lớn hơn 0"
-    )
+    @NotNull(message = "Số tiền không được để trống")
+    @DecimalMin(value = "0.01", message = "Số tiền phải lớn hơn 0")
     private BigDecimal amount;
 
+    @NotNull(message = "Ngày chi tiêu không được để trống")
     private LocalDate expenseDate;
 
-    private GroupMember paidBy;
+    @NotNull(message = "ID người trả tiền không được để trống")
+    private Long paidById;
 
+    @NotEmpty(message = "Danh sách người tham gia chia tiền không được để trống")
     private List<Long> participantIds;
 }

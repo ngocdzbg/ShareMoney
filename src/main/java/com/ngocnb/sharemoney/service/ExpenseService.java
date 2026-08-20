@@ -6,21 +6,13 @@ import com.ngocnb.sharemoney.dto.response.ExpenseResponse;
 import org.springframework.data.domain.Page;
 
 public interface ExpenseService {
-    Page<ExpenseResponse> getAllExpenses(
-            int page,
-            int size,
-            String sortBy,
-            String direction
-    );
+    ExpenseResponse createExpense(Long groupId, ExpenseCreateRequest request);
 
-    ExpenseResponse getExpenseById(Long id);
+    ExpenseResponse getExpenseById(Long groupId, Long expenseId);
 
-    ExpenseResponse createExpense(ExpenseCreateRequest request);
+    Page<ExpenseResponse> getExpensesByGroupId(Long groupId, int page, int size, String sortBy, String direction);
 
-    ExpenseResponse updateExpense(
-            Long id,
-            ExpenseUpdateRequest request
-    );
+    ExpenseResponse updateExpense(Long groupId, Long expenseId, ExpenseUpdateRequest request);
 
-    void deleteExpenseById(Long id);
+    void deleteExpense(Long groupId, Long expenseId);
 }
