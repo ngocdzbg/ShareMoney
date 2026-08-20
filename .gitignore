@@ -3,7 +3,15 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-**/src/main/**/application.properties
+
+# .gitignore
+**/src/main/resources/application.properties
+**/src/main/resources/application-*.properties
+
+# Cho phép đẩy file mẫu (nếu có)
+!**/src/main/resources/application.properties.example
+!**/src/main/resources/application-*.properties.example
+
 ### STS ###
 .apt_generated
 .classpath

@@ -1,13 +1,11 @@
 package com.ngocnb.sharemoney.dto.request;
 
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 public class ExpenseCreateRequest {
@@ -16,11 +14,10 @@ public class ExpenseCreateRequest {
     private Long groupId;
 
     @NotBlank(message = "Description không được để trống")
-    @Size(max = 255, message = "Description không được vượt quá 255 ký tự")
     private String description;
 
     @NotNull(message = "Amount không được để trống")
-    @DecimalMin(value = "0.01", message = "Amount phải lớn hơn 0")
+    @DecimalMin(value = "0.01")
     private BigDecimal amount;
 
     @NotNull(message = "Expense date không được để trống")
@@ -28,4 +25,7 @@ public class ExpenseCreateRequest {
 
     @NotNull(message = "Paid by không được để trống")
     private Long paidBy;
+
+    @NotEmpty(message = "Phải có ít nhất một người tham gia")
+    private List<Long> participantIds;
 }

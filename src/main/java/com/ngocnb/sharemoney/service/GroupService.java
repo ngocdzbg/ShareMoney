@@ -1,12 +1,12 @@
 package com.ngocnb.sharemoney.service;
 
-import com.ngocnb.sharemoney.dto.request.CreateGroupRequest;
-import com.ngocnb.sharemoney.dto.request.UpdateGroupRequest;
+import com.ngocnb.sharemoney.dto.request.GroupCreateRequest;
+import com.ngocnb.sharemoney.dto.request.GroupUpdateRequest;
 import com.ngocnb.sharemoney.dto.response.GroupResponse;
 import org.springframework.data.domain.Page;
 
 public interface GroupService {
-    GroupResponse createGroup(CreateGroupRequest request);
+    GroupResponse createGroup(GroupCreateRequest request);
 
     GroupResponse getGroupById(Long id);
 
@@ -17,7 +17,7 @@ public interface GroupService {
             String direction
     );
 
-    GroupResponse updateGroup(Long id, UpdateGroupRequest req);
+    GroupResponse updateGroup(Long id, GroupUpdateRequest req);
 
     void deleteGroup(Long id);
 }

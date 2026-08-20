@@ -9,7 +9,15 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "expense_participants")
+@Table(
+        name = "expense_participants",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_expense_participant",
+                        columnNames = {"expense_id", "user_id"}
+                )
+        }
+)
 @Data
 @Builder
 @NoArgsConstructor

@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
@@ -21,4 +22,6 @@ public class ExpenseResponse {
     private LocalDate expenseDate;
 
     private Long paidBy;
+
+    private List<Long> participantIds;
 }

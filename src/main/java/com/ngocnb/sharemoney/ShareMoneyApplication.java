@@ -49,6 +49,7 @@ public class ShareMoneyApplication {
                 ║     • Username: admin                                     ║
                 ║     • Password: 123456                                    ║
                 ╚═══════════════════════════════════════════════════════════╝
+                
                 """);
     }
 }

@@ -4,8 +4,6 @@ import com.ngocnb.sharemoney.dto.request.ExpenseCreateRequest;
 import com.ngocnb.sharemoney.dto.request.ExpenseUpdateRequest;
 import com.ngocnb.sharemoney.dto.response.ExpenseResponse;
 import com.ngocnb.sharemoney.service.ExpenseService;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,12 +16,13 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/expenses")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Expense Management", description = "API để quản lý expense")
-@SecurityRequirement(name = "Bearer Authentication")
 public class ExpenseController {
+
     private final ExpenseService expenseService;
 
     /**
+     * Lấy danh sách expense
+     *
      * GET /api/expenses
      */
     @GetMapping
@@ -54,19 +53,26 @@ public class ExpenseController {
     }
 
     /**
+     * Lấy expense theo ID
+     *
      * GET /api/expenses/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<ExpenseResponse> getExpenseById(@PathVariable Long id) {
+    public ResponseEntity<ExpenseResponse> getExpenseById(
+            @PathVariable Long id
+    ) {
 
         log.info("GET /api/expenses/{}", id);
 
-        ExpenseResponse expense = expenseService.getExpenseById(id);
+        ExpenseResponse expense =
+                expenseService.getExpenseById(id);
 
         return ResponseEntity.ok(expense);
     }
 
     /**
+     * Tạo expense mới
+     *
      * POST /api/expenses
      */
     @PostMapping
@@ -74,9 +80,14 @@ public class ExpenseController {
             @Valid @RequestBody ExpenseCreateRequest request
     ) {
 
-        log.info("POST /api/expenses - description: {}", request.getDescription());
+        log.info(
+                "POST /api/expenses - description: {}, amount: {}",
+                request.getDescription(),
+                request.getAmount()
+        );
 
-        ExpenseResponse expense = expenseService.createExpense(request);
+        ExpenseResponse expense =
+                expenseService.createExpense(request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -84,6 +95,8 @@ public class ExpenseController {
     }
 
     /**
+     * Cập nhật một phần expense
+     *
      * PATCH /api/expenses/{id}
      */
     @PatchMapping("/{id}")
@@ -94,12 +107,15 @@ public class ExpenseController {
 
         log.info("PATCH /api/expenses/{}", id);
 
-        ExpenseResponse expense = expenseService.updateExpense(id, request);
+        ExpenseResponse expense =
+                expenseService.updateExpense(id, request);
 
         return ResponseEntity.ok(expense);
     }
 
     /**
+     * Xóa expense
+     *
      * DELETE /api/expenses/{id}
      */
     @DeleteMapping("/{id}")

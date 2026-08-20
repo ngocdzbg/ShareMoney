@@ -1,7 +1,7 @@
 package com.ngocnb.sharemoney.service.Impl;
 
-import com.ngocnb.sharemoney.dto.request.CreateGroupRequest;
-import com.ngocnb.sharemoney.dto.request.UpdateGroupRequest;
+import com.ngocnb.sharemoney.dto.request.GroupCreateRequest;
+import com.ngocnb.sharemoney.dto.request.GroupUpdateRequest;
 import com.ngocnb.sharemoney.dto.response.GroupResponse;
 import com.ngocnb.sharemoney.entity.Group;
 import com.ngocnb.sharemoney.repository.GroupRepository;
@@ -27,7 +27,7 @@ public class GroupServiceImpl implements GroupService {
 
     @Override
     @Transactional
-    public GroupResponse createGroup(CreateGroupRequest request) {
+    public GroupResponse createGroup(GroupCreateRequest request) {
         log.debug("Creating new group: {}", request.getGroupName());
         Group group = Group.builder()
                 .name(request.getGroupName())
@@ -115,7 +115,7 @@ public class GroupServiceImpl implements GroupService {
 
     @Override
     @Transactional
-    public GroupResponse updateGroup(Long id, UpdateGroupRequest req) {
+    public GroupResponse updateGroup(Long id, GroupUpdateRequest req) {
         log.debug("Updating group with id: {}", id);
 
         Group group = groupRepository.findById(id)
