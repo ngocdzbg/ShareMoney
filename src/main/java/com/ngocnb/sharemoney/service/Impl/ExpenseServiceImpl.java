@@ -122,6 +122,7 @@ public class ExpenseServiceImpl implements ExpenseService {
 
         // Xóa danh sách participant cũ (orphanRemoval = true sẽ tự xóa dưới DB)
         expense.getParticipants().clear();
+        expenseRepository.flush();
 
         // Tính toán chia tiền lại từ đầu
         List<ExpenseParticipant> updatedParticipants = calculateEqualShares(expense, request.getAmount(), request.getParticipantIds(), memberMap);
@@ -143,8 +144,12 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     /**
-     * Logic chia đều số tiền (Amount) cho N người tham gia.
-     * Xử lý trường hợp chia dư lẻ cent/đồng (vd: 100.00 / 3 người = 33.33 x 3 = 99.99 -> lẻ 0.01 dư sẽ gánh ở người đầu tiên)
+     * Chia đều số tiền cho tất cả người tham gia.
+     * ShareAmount của tất cả người là như nhau và giữ ở hàng đơn vị.
+     * <p>
+     * Ví dụ:
+     * 100 / 3 = 33
+     * 33 x 3 = 99
      */
     private List<ExpenseParticipant> calculateEqualShares(
             Expense expense,
@@ -155,21 +160,13 @@ public class ExpenseServiceImpl implements ExpenseService {
         int count = participantIds.size();
         BigDecimal countBD = BigDecimal.valueOf(count);
 
-        // Chia làm tròn xuống 2 chữ số thập phân
-        BigDecimal baseShare = totalAmount.divide(countBD, 2, RoundingMode.DOWN);
-
-        // Tính phần dư lẻ: totalAmount - (baseShare * count)
-        BigDecimal totalAssigned = baseShare.multiply(countBD);
-        BigDecimal remainder = totalAmount.subtract(totalAssigned);
+        // Chia đều và chỉ giữ phần nguyên (hàng đơn vị)
+        BigDecimal shareAmount = totalAmount.divide(countBD, 0, RoundingMode.DOWN);
 
         List<ExpenseParticipant> participants = new ArrayList<>();
 
-        for (int i = 0; i < count; i++) {
-            Long memberId = participantIds.get(i);
+        for (Long memberId : participantIds) {
             GroupMember member = memberMap.get(memberId);
-
-            // Cộng phần lẻ dư vào người tham gia đầu tiên để tổng shareAmount luôn đúng bằng totalAmount
-            BigDecimal shareAmount = (i == 0) ? baseShare.add(remainder) : baseShare;
 
             ExpenseParticipant participant = ExpenseParticipant.builder()
                     .expense(expense)
