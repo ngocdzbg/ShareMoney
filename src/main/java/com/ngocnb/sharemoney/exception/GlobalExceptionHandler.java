@@ -1,11 +1,15 @@
 package com.ngocnb.sharemoney.exception;
 
+import com.ngocnb.sharemoney.dto.response.ErrorResponse;
+import jakarta.persistence.OptimisticLockException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -18,7 +22,7 @@ import java.util.Map;
 
 /**
  * Global Exception Handler - Xử lý tất cả exceptions toàn ứng dụng
- *
+ * <p>
  * Tạo error responses thống nhất cho tất cả endpoints
  * Được apply trên tất cả @RestController
  *
@@ -110,45 +114,23 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    /**
-     * DTO - Error Response
-     * <p>
-     * Cấu trúc thống nhất cho tất cả error responses
-     */
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class ErrorResponse {
+    @ExceptionHandler({
+            OptimisticLockException.class,
+            ObjectOptimisticLockingFailureException.class
+    })
+    public ResponseEntity<ErrorResponse> handleOptimisticLock(
+            Exception exception,
+            WebRequest request
+    ) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error("OPTIMISTIC_LOCK_CONFLICT")
+                .message("Expense has been modified by another request")
+                .details(exception.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
 
-        /**
-         * Thời gian error xảy ra
-         */
-        private LocalDateTime timestamp;
-
-        /**
-         * HTTP status code
-         */
-        private int status;
-
-        /**
-         * Error type (NOT_FOUND, VALIDATION_ERROR, v.v.)
-         */
-        private String error;
-
-        /**
-         * Error message
-         */
-        private String message;
-
-        /**
-         * Chi tiết lỗi (thường là validation errors)
-         */
-        private String details;
-
-        /**
-         * Request path
-         */
-        private String path;
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
     }
 }
