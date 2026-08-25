@@ -11,6 +11,7 @@ import com.ngocnb.sharemoney.repository.ExpenseRepository;
 import com.ngocnb.sharemoney.repository.GroupMemberRepository;
 import com.ngocnb.sharemoney.repository.GroupNameRepository;
 import com.ngocnb.sharemoney.service.ExpenseService;
+import jakarta.persistence.OptimisticLockException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -112,6 +113,12 @@ public class ExpenseServiceImpl implements ExpenseService {
         GroupMember paidBy = groupMemberRepository.findByIdAndGroupId(request.getPaidById(), groupId)
                 .orElseThrow(() -> new ResourceNotFoundException("PaidBy member not found with id: " + request.getPaidById() + " in group: " + groupId));
 
+        if (!expense.getVersion().equals(request.getVersion())) {
+            throw new OptimisticLockException(
+                    "Expense has been modified by another request"
+            );
+        }
+
         Map<Long, GroupMember> memberMap = validateAndGetMembers(groupId, request.getParticipantIds());
 
         // Cập nhật thông tin cơ bản
@@ -212,6 +219,7 @@ public class ExpenseServiceImpl implements ExpenseService {
         return ExpenseResponse.builder()
                 .id(expense.getId())
                 .groupId(expense.getGroup().getId())
+                .version(expense.getVersion())
                 .description(expense.getDescription())
                 .amount(expense.getAmount())
                 .expenseDate(expense.getExpenseDate())
