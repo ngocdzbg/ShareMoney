@@ -433,19 +433,19 @@ public class ExpenseServiceImpl implements ExpenseService {
 
     /**
      * Tạo danh sách ExpenseParticipant khi CREATE Expense.
-     *
+     * <p>
      * ShareAmount của tất cả người tham gia bằng nhau.
-     *
+     * <p>
      * Chỉ giữ phần nguyên ở hàng đơn vị.
-     *
+     * <p>
      * Ví dụ:
-     *
+     * <p>
      * 100 / 3 = 33
-     *
+     * <p>
      * Người 1 = 33
      * Người 2 = 33
      * Người 3 = 33
-     *
+     * <p>
      * Tổng = 99
      */
     private List<ExpenseParticipant> createEqualShareParticipants(
@@ -491,14 +491,14 @@ public class ExpenseServiceImpl implements ExpenseService {
 
     /**
      * Tính lại shareAmount cho các ExpenseParticipant hiện tại.
-     *
+     * <p>
      * Hàm này KHÔNG tạo ExpenseParticipant mới.
      * Chỉ cập nhật shareAmount trên entity đang tồn tại.
-     *
+     * <p>
      * Ví dụ:
-     *
+     * <p>
      * 100 / 3 = 33
-     *
+     * <p>
      * participant 1 = 33
      * participant 2 = 33
      * participant 3 = 33
