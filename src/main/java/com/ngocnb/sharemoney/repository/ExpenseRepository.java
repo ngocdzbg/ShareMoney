@@ -4,6 +4,7 @@ import com.ngocnb.sharemoney.entity.Expense;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -70,4 +71,14 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     );
 
     //------------------------------------------------------------
+
+    @Query("""
+                SELECT e
+                FROM Expense e
+                WHERE e.group.id = :groupId
+            """)
+    Slice<Expense> findSliceByGroupId(
+            @Param("groupId") Long groupId,
+            Pageable pageable
+    );
 }

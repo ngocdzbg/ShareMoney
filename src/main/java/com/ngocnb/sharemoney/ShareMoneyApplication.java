@@ -2,6 +2,7 @@ package com.ngocnb.sharemoney;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Main Application Entry Point - Fruit Management System
@@ -26,6 +27,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @since 2026
  */
 @SpringBootApplication
+@EnableScheduling
 public class ShareMoneyApplication {
 
     public static void main(String[] args) {

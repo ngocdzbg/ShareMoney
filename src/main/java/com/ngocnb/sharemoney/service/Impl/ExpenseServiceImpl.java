@@ -1,6 +1,7 @@
 package com.ngocnb.sharemoney.service.Impl;
 
 import com.ngocnb.sharemoney.dto.request.ExpenseCreateRequest;
+import com.ngocnb.sharemoney.dto.cache.ExpenseSliceCache;
 import com.ngocnb.sharemoney.dto.request.ExpenseUpdateRequest;
 import com.ngocnb.sharemoney.dto.response.ExpenseParticipantResponse;
 import com.ngocnb.sharemoney.dto.response.ExpenseResponse;
@@ -8,26 +9,30 @@ import com.ngocnb.sharemoney.entity.Expense;
 import com.ngocnb.sharemoney.entity.ExpenseParticipant;
 import com.ngocnb.sharemoney.entity.GroupMember;
 import com.ngocnb.sharemoney.entity.GroupName;
+import com.ngocnb.sharemoney.event.ExpenseEvent;
+import com.ngocnb.sharemoney.event.ExpenseEventType;
 import com.ngocnb.sharemoney.exception.BadRequestException;
 import com.ngocnb.sharemoney.exception.ResourceNotFoundException;
 import com.ngocnb.sharemoney.repository.ExpenseRepository;
 import com.ngocnb.sharemoney.repository.GroupMemberRepository;
 import com.ngocnb.sharemoney.repository.GroupNameRepository;
 import com.ngocnb.sharemoney.service.ExpenseService;
+import com.ngocnb.sharemoney.outbox.OutboxService;
+import com.ngocnb.sharemoney.service.RedisCacheService;
 import jakarta.persistence.OptimisticLockException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -39,6 +44,100 @@ public class ExpenseServiceImpl implements ExpenseService {
     private final ExpenseRepository expenseRepository;
     private final GroupNameRepository groupNameRepository;
     private final GroupMemberRepository groupMemberRepository;
+
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+    private final RedisCacheService redisCacheService;
+
+    private final OutboxService outboxService;
+
+    private String buildExpenseListCacheKey(
+            Long groupId,
+            int page,
+            int size,
+            String sortBy,
+            String direction
+    ) {
+        return String.format(
+                "expenses:group:%d:page:%d:size:%d:sort:%s:%s",
+                groupId,
+                page,
+                size,
+                sortBy,
+                direction.toUpperCase()
+        );
+    }
+
+    private void saveExpenseCache(
+            String cacheKey,
+            ExpenseSliceCache cache
+    ) {
+
+        try {
+            String json = objectMapper.writeValueAsString(cache);
+
+            log.info("========== REDIS DEBUG ==========");
+            log.info("KEY: {}", cacheKey);
+            log.info("JSON LENGTH: {}", json.length());
+
+            redisTemplate.opsForValue().set(
+                    cacheKey,
+                    json,
+                    Duration.ofMinutes(10)
+            );
+
+            String value =
+                    redisTemplate.opsForValue().get(cacheKey);
+
+            log.info("READ AFTER WRITE: {}", value != null);
+            log.info(
+                    "READ VALUE LENGTH: {}",
+                    value != null ? value.length() : 0
+            );
+
+            Boolean exists =
+                    redisTemplate.hasKey(cacheKey);
+
+            log.info("HAS KEY: {}", exists);
+
+            Long ttl =
+                    redisTemplate.getExpire(cacheKey);
+
+            log.info("TTL: {} seconds", ttl);
+
+            log.info("================================");
+
+        } catch (Exception e) {
+
+            log.error(
+                    "REDIS SAVE FAILED: {}",
+                    cacheKey,
+                    e
+            );
+
+            throw new RuntimeException(
+                    "Failed to save expense cache",
+                    e
+            );
+        }
+    }
+
+
+    private void evictExpenseCache(Long groupId) {
+        String pattern = "expenses:group:" + groupId + ":*";
+
+        Set<String> keys = redisTemplate.keys(pattern);
+
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+
+            log.info(
+                    "Redis CACHE EVICT: groupId={}, keys={}",
+                    groupId,
+                    keys
+            );
+        }
+    }
 
     @Override
     @Transactional
@@ -103,6 +202,21 @@ public class ExpenseServiceImpl implements ExpenseService {
         expense.getParticipants().addAll(participants);
 
         Expense savedExpense = expenseRepository.save(expense);
+        // Invalidate Redis
+        redisCacheService.deleteExpenseCacheByGroupId(groupId);
+
+        ExpenseEvent event = ExpenseEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .eventType(ExpenseEventType.EXPENSE_CREATED)
+                .expenseId(savedExpense.getId())
+                .groupId(groupId)
+                .paidByMemberId(savedExpense.getPaidBy().getId())
+                .amount(savedExpense.getAmount())
+                .description(savedExpense.getDescription())
+                .occurredAt(LocalDateTime.now())
+                .build();
+
+        saveOutboxEvent(event);
 
         return mapToResponse(savedExpense);
     }
@@ -138,13 +252,14 @@ public class ExpenseServiceImpl implements ExpenseService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ExpenseResponse> getExpensesByGroupId(
+    public Slice<ExpenseResponse> getExpensesByGroupId(
             Long groupId,
             int page,
             int size,
             String sortBy,
             String direction
     ) {
+
         log.info(
                 "Service: Fetching expenses for group ID: {}",
                 groupId
@@ -156,6 +271,8 @@ public class ExpenseServiceImpl implements ExpenseService {
             );
         }
 
+        int safeSize = Math.min(size, 30);
+
         Sort sort = direction.equalsIgnoreCase(
                 Sort.Direction.ASC.name()
         )
@@ -164,37 +281,123 @@ public class ExpenseServiceImpl implements ExpenseService {
 
         Pageable pageable = PageRequest.of(
                 page,
-                Math.min(size, 30),
+                safeSize,
                 sort
         );
 
-        // Query 1:
-        // Lấy Expense theo pagination ở database
-        Page<Expense> expensePage =
-                expenseRepository.findByGroupId(
+        String cacheKey = buildExpenseListCacheKey(
+                groupId,
+                page,
+                safeSize,
+                sortBy,
+                direction
+        );
+
+        /*
+         * ==========================================
+         * 1. CACHE HIT
+         * ==========================================
+         */
+
+        String cachedJson = redisTemplate
+                .opsForValue()
+                .get(cacheKey);
+
+        if (cachedJson != null) {
+
+            log.info(
+                    "Redis CACHE HIT: {}",
+                    cacheKey
+            );
+
+            ExpenseSliceCache cached;
+
+            try {
+                cached = objectMapper.readValue(
+                        cachedJson,
+                        ExpenseSliceCache.class
+                );
+            } catch (Exception e) {
+                log.warn(
+                        "Failed to deserialize Redis cache: {}",
+                        cacheKey,
+                        e
+                );
+
+                redisTemplate.delete(cacheKey);
+
+                cached = null;
+            }
+
+            if (cached != null) {
+                return new SliceImpl<>(
+                        cached.getContent(),
+                        pageable,
+                        cached.isHasNext()
+                );
+            }
+        }
+
+        /*
+         * ==========================================
+         * 2. CACHE MISS → DATABASE
+         * ==========================================
+         */
+
+        log.info(
+                "Redis CACHE MISS: {}",
+                cacheKey
+        );
+
+        Slice<Expense> expenseSlice =
+                expenseRepository.findSliceByGroupId(
                         groupId,
                         pageable
                 );
 
-        if (expensePage.isEmpty()) {
-            return Page.empty(pageable);
+        if (expenseSlice.isEmpty()) {
+
+            ExpenseSliceCache emptyCache =
+                    new ExpenseSliceCache(
+                            List.of(),
+                            false
+                    );
+
+            saveExpenseCache(
+                    cacheKey,
+                    emptyCache
+            );
+
+            return new SliceImpl<>(
+                    List.of(),
+                    pageable,
+                    false
+            );
         }
 
-        // Lấy danh sách Expense ID của page hiện tại
+        /*
+         * ==========================================
+         * 3. GET EXPENSE DETAILS
+         * ==========================================
+         */
+
         List<Long> expenseIds =
-                expensePage.getContent()
+                expenseSlice.getContent()
                         .stream()
                         .map(Expense::getId)
                         .toList();
 
-        // Query 2:
-        // Fetch participants + groupMember
         List<Expense> expensesWithDetails =
                 expenseRepository.findAllByIdInFetchDetails(
                         expenseIds
                 );
 
-        // Map để giữ đúng thứ tự pagination
+        /*
+         * ==========================================
+         * 4. RESTORE ORIGINAL ORDER
+         * ==========================================
+         */
+
         Map<Long, Expense> expenseMap =
                 expensesWithDetails.stream()
                         .collect(Collectors.toMap(
@@ -202,18 +405,42 @@ public class ExpenseServiceImpl implements ExpenseService {
                                 expense -> expense
                         ));
 
-        // Rebuild response theo đúng thứ tự của Query 1
         List<ExpenseResponse> responses =
-                expensePage.getContent()
+                expenseSlice.getContent()
                         .stream()
-                        .map(expense -> expenseMap.get(expense.getId()))
+                        .map(expense ->
+                                expenseMap.get(expense.getId())
+                        )
                         .map(this::mapToResponse)
                         .toList();
 
-        return new PageImpl<>(
+        /*
+         * ==========================================
+         * 5. SAVE TO REDIS
+         * ==========================================
+         */
+
+        ExpenseSliceCache cache =
+                new ExpenseSliceCache(
+                        responses,
+                        expenseSlice.hasNext()
+                );
+
+        saveExpenseCache(
+                cacheKey,
+                cache
+        );
+
+        /*
+         * ==========================================
+         * 6. RETURN RESPONSE
+         * ==========================================
+         */
+
+        return new SliceImpl<>(
                 responses,
                 pageable,
-                expensePage.getTotalElements()
+                expenseSlice.hasNext()
         );
     }
 
@@ -399,6 +626,22 @@ public class ExpenseServiceImpl implements ExpenseService {
         Expense savedExpense =
                 expenseRepository.save(expense);
 
+        // Invalidate cache
+        redisCacheService.deleteExpenseCacheByGroupId(groupId);
+
+        ExpenseEvent event = ExpenseEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .eventType(ExpenseEventType.EXPENSE_UPDATED)
+                .expenseId(savedExpense.getId())
+                .groupId(groupId)
+                .paidByMemberId(savedExpense.getPaidBy().getId())
+                .amount(savedExpense.getAmount())
+                .description(savedExpense.getDescription())
+                .occurredAt(LocalDateTime.now())
+                .build();
+
+        saveOutboxEvent(event);
+
         return mapToResponse(savedExpense);
     }
 
@@ -429,6 +672,21 @@ public class ExpenseServiceImpl implements ExpenseService {
                 );
 
         expenseRepository.delete(expense);
+
+        redisCacheService.deleteExpenseCacheByGroupId(groupId);
+
+        ExpenseEvent event = ExpenseEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .eventType(ExpenseEventType.EXPENSE_DELETED)
+                .expenseId(expense.getId())
+                .groupId(groupId)
+                .paidByMemberId(expense.getPaidBy().getId())
+                .amount(expense.getAmount())
+                .description(expense.getDescription())
+                .occurredAt(LocalDateTime.now())
+                .build();
+
+        saveOutboxEvent(event);
     }
 
     /**
@@ -582,6 +840,19 @@ public class ExpenseServiceImpl implements ExpenseService {
                         GroupMember::getId,
                         Function.identity()
                 ));
+    }
+
+    private void saveOutboxEvent(ExpenseEvent event) {
+        String payload = objectMapper.writeValueAsString(event);
+
+        outboxService.save(
+                event.getEventId(),
+                event.getEventType().name(),
+                "EXPENSE",
+                event.getExpenseId(),
+                "expense-events",
+                payload
+        );
     }
 
     /**
