@@ -9,9 +9,9 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.ngocnb</groupId>
-    <artifactId>sharemoney</artifactId>
-    <version>2026.0217</version>
-    <name>Share Money</name>
+    <artifactId>Share-Money</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>Share-Money</name>
     <description>REST API để quản lý trái cây với JWT Authentication và Swagger Documentation</description>
     <url/>
     <licenses>
@@ -129,6 +129,26 @@
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
     </dependencies>
 

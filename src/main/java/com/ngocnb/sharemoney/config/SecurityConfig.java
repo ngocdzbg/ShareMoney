@@ -83,6 +83,7 @@ public class SecurityConfig {
                         // Endpoints công khai - không cần JWT
 //                        .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/**").permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
 
                         // Hiện tại: Tất cả /api/fruits chỉ cần authenticated (chưa phân quyền chi tiết)

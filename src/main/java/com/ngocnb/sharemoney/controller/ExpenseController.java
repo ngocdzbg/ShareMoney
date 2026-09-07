@@ -13,6 +13,7 @@ import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -68,7 +69,7 @@ public class ExpenseController {
             description = "Lấy danh sách phân trang các khoản chi thuộc về nhóm chỉ định, hỗ trợ sắp xếp theo ID, số tiền hoặc ngày chi tiêu."
     )
     @GetMapping
-    public ResponseEntity<Page<ExpenseResponse>> getAllExpenses(
+    public ResponseEntity<Slice<ExpenseResponse>> getAllExpenses(
             @PathVariable
             @Positive(message = "GroupId must be greater than 0")
             Long groupId,
@@ -87,7 +88,7 @@ public class ExpenseController {
     ) {
         log.info("GET /api/groups/{}/expenses - page: {}, size: {}, sortBy: {}, direction: {}",
                 groupId, page, size, sortBy, direction);
-        Page<ExpenseResponse> expenses = expenseService.getExpensesByGroupId(groupId, page, size, sortBy, direction);
+        Slice<ExpenseResponse> expenses = expenseService.getExpensesByGroupId(groupId, page, size, sortBy, direction);
         return ResponseEntity.ok(expenses);
     }
 
