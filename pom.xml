@@ -9,9 +9,9 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.ngocnb</groupId>
-    <artifactId>sharemoney</artifactId>
-    <version>2026.0217</version>
-    <name>Share Money</name>
+    <artifactId>Share-Money</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>Share-Money</name>
     <description>REST API để quản lý trái cây với JWT Authentication và Swagger Documentation</description>
     <url/>
     <licenses>

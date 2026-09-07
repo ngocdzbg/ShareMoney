@@ -1,29 +1,28 @@
 services:
 
   # =========================
-  # PostgreSQL
+  # MySQL
   # =========================
-  postgres:
-    image: postgres:16
-    container_name: sharemoney-postgres
+  mysql:
+    image: mysql:8.4
+    container_name: sharemoney-mysql
     restart: unless-stopped
 
     environment:
-      POSTGRES_DB: sharemoney
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: apifirst
 
     ports:
-      - "5432:5432"
+      - "3307:3306"
 
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
 
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d sharemoney" ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-p123456" ]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
 
   # =========================
@@ -61,16 +60,13 @@ services:
       - "9092:9092"
 
     environment:
-      # KRaft mode
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
 
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
 
-      # Internal Docker communication
       KAFKA_LISTENERS: PLAINTEXT://:29092,CONTROLLER://:29093,PLAINTEXT_HOST://:9092
 
-      # Client communication
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
 
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
@@ -78,7 +74,6 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
 
-      # Single broker
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
@@ -87,7 +82,6 @@ services:
 
       KAFKA_NUM_PARTITIONS: 3
 
-      # Retention
       KAFKA_LOG_RETENTION_HOURS: 168
 
     volumes:
@@ -124,11 +118,46 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
 
 
+  # =========================
+  # Backend
+  # =========================
+  backend:
+    image: sharemoney-backend:latest
+    container_name: sharemoney-backend
+    restart: unless-stopped
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+
+      JWT_SECRET: ${JWT_SECRET}
+
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+
+    ports:
+      - "6969:6969"
+
+
 # =========================
 # Volumes
 # =========================
 volumes:
-  postgres_data:
+  mysql_data:
   redis_data:
   kafka_data:
-
