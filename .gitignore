@@ -5,11 +5,12 @@ target/
 !**/src/test/**/target/
 
 # .gitignore
-**/src/main/resources/application.properties
-**/src/main/resources/application-*.properties
 .env
 .env.*
 application-secret.properties
+
+# Keep local config private
+src/main/resources/application-local.properties
 
 # Cho phép đẩy file mẫu (nếu có)
 !**/src/main/resources/application.properties.example
