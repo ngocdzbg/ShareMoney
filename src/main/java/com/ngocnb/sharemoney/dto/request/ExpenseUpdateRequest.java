@@ -26,6 +26,9 @@ public class ExpenseUpdateRequest {
     @DecimalMin(value = "0.01", message = "Số tiền phải lớn hơn 0")
     private BigDecimal amount;
 
+    @NotNull
+    private Long version;
+
     @NotNull(message = "Ngày chi tiêu không được để trống")
     private LocalDate expenseDate;
 

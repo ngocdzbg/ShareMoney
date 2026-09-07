@@ -19,6 +19,7 @@ public class ExpenseResponse {
     private Long groupId;
     private String description;
     private BigDecimal amount;
+    private Long version;
     private LocalDate expenseDate;
 
     // Thông tin người trả tiền
