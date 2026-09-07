@@ -1,6 +1,7 @@
 package com.ngocnb.sharemoney.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.support.serializer.JacksonJsonSerializer;
 import com.ngocnb.sharemoney.event.ExpenseEvent;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -15,6 +16,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+@ConditionalOnProperty(
+        name = "app.kafka.enabled",
+        havingValue = "true"
+)
 public class KafkaConfig {
 
     @Bean
