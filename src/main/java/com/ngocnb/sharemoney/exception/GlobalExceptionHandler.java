@@ -2,11 +2,7 @@ package com.ngocnb.sharemoney.exception;
 
 import com.ngocnb.sharemoney.dto.response.ErrorResponse;
 import jakarta.persistence.OptimisticLockException;
-import jakarta.servlet.http.HttpServletRequest;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -20,62 +16,51 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Global Exception Handler - Xử lý tất cả exceptions toàn ứng dụng
- * <p>
- * Tạo error responses thống nhất cho tất cả endpoints
- * Được apply trên tất cả @RestController
- *
- * @author NgocNB
- * @version 2026.0217
- * @since 2026
- */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /**
-     * Handle ResourceNotFoundException
-     * <p>
-     * Khi resource không tìm thấy (HTTP 404)
-     *
-     * @param exception ResourceNotFoundException
-     * @param request   WebRequest
-     * @return ErrorResponse với status 404
-     */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFoundException(
-            ResourceNotFoundException exception, WebRequest request) {
+            ResourceNotFoundException exception,
+            WebRequest request
+    ) {
+        log.warn(
+                "Resource not found at {}: {}",
+                getPath(request),
+                exception.getMessage()
+        );
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.NOT_FOUND.value())
                 .error("NOT_FOUND")
                 .message(exception.getMessage())
-                .path(request.getDescription(false).replace("uri=", ""))
+                .path(getPath(request))
                 .build();
 
         return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
     }
 
-    /**
-     * Handle validation exceptions
-     * <p>
-     * Khi request body validation thất bại (HTTP 400)
-     *
-     * @param exception MethodArgumentNotValidException
-     * @param request   WebRequest
-     * @return ErrorResponse với status 400 và chi tiết validation errors
-     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(
-            MethodArgumentNotValidException exception, WebRequest request) {
-
+            MethodArgumentNotValidException exception,
+            WebRequest request
+    ) {
         Map<String, String> validationErrors = new HashMap<>();
+
         exception.getBindingResult().getAllErrors().forEach(error -> {
             String fieldName = ((FieldError) error).getField();
             String errorMessage = error.getDefaultMessage();
+
             validationErrors.put(fieldName, errorMessage);
         });
+
+        log.warn(
+                "Validation failed at {}: {}",
+                getPath(request),
+                validationErrors
+        );
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
@@ -83,35 +68,10 @@ public class GlobalExceptionHandler {
                 .error("VALIDATION_ERROR")
                 .message("Validation failed")
                 .details(validationErrors.toString())
-                .path(request.getDescription(false).replace("uri=", ""))
+                .path(getPath(request))
                 .build();
 
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
-    }
-
-    /**
-     * Handle generic exceptions
-     * <p>
-     * Catch-all handler cho những exception không được handle riêng
-     *
-     * @param exception Exception
-     * @param request   WebRequest
-     * @return ErrorResponse với status 500
-     */
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGlobalException(
-            Exception exception, WebRequest request) {
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .error("INTERNAL_SERVER_ERROR")
-                .message("An unexpected error occurred")
-                .details(exception.getMessage())
-                .path(request.getDescription(false).replace("uri=", ""))
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     @ExceptionHandler({
@@ -122,15 +82,48 @@ public class GlobalExceptionHandler {
             Exception exception,
             WebRequest request
     ) {
+        log.warn(
+                "Optimistic lock conflict at {}: {}",
+                getPath(request),
+                exception.getMessage()
+        );
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.CONFLICT.value())
                 .error("OPTIMISTIC_LOCK_CONFLICT")
                 .message("Expense has been modified by another request")
                 .details(exception.getMessage())
-                .path(request.getDescription(false).replace("uri=", ""))
+                .path(getPath(request))
                 .build();
 
         return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGlobalException(
+            Exception exception,
+            WebRequest request
+    ) {
+        log.error(
+                "Unhandled exception at {}",
+                getPath(request),
+                exception
+        );
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .error("INTERNAL_SERVER_ERROR")
+                .message("An unexpected error occurred")
+                .details(exception.getMessage())
+                .path(getPath(request))
+                .build();
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    private String getPath(WebRequest request) {
+        return request.getDescription(false).replace("uri=", "");
     }
 }
