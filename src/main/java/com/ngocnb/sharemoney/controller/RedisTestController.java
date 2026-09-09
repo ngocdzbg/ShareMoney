@@ -1,35 +1,47 @@
 package com.ngocnb.sharemoney.controller;
 
+import com.ngocnb.sharemoney.service.RedisCacheService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/redis")
 @RequiredArgsConstructor
 public class RedisTestController {
 
-    private final StringRedisTemplate redisTemplate;
+    private final RedisCacheService redisCacheService;
 
     @PostMapping("/test")
-    public String set() {
+    public ResponseEntity<Map<String, Object>> set() {
 
-        redisTemplate.opsForValue().set(
+        boolean saved = redisCacheService.setSafely(
                 "test:key",
                 "Hello Redis",
                 Duration.ofMinutes(5)
         );
 
-        return "Redis value saved";
+        return ResponseEntity.ok(Map.of(
+                "redisAvailable", saved,
+                "message", saved ? "Redis value saved" : "Redis unavailable, write skipped"
+        ));
     }
 
     @GetMapping("/test")
-    public String get() {
+    public ResponseEntity<Map<String, Object>> get() {
 
-        return redisTemplate
-                .opsForValue()
-                .get("test:key");
+        return redisCacheService.getSafely("test:key")
+                .<ResponseEntity<Map<String, Object>>>map(value -> ResponseEntity.ok(Map.of(
+                        "redisAvailable", true,
+                        "cacheHit", true,
+                        "value", value
+                )))
+                .orElseGet(() -> ResponseEntity.ok(Map.of(
+                        "redisAvailable", false,
+                        "cacheHit", false
+                )));
     }
 }
