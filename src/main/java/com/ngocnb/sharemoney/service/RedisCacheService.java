@@ -1,5 +1,6 @@
 package com.ngocnb.sharemoney.service;
 
+import com.ngocnb.sharemoney.observability.ExceptionLogUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.Cursor;
@@ -20,6 +21,11 @@ public class RedisCacheService {
     public void deleteExpenseCacheByGroupId(Long groupId) {
 
         String pattern = "expenses:group:" + groupId + ":*";
+        log.info(
+                "Service RedisCacheService.deleteExpenseCacheByGroupId started groupId={} operation=SCAN pattern={}",
+                groupId,
+                pattern
+        );
 
         ScanOptions options = ScanOptions.scanOptions()
                 .match(pattern)
@@ -33,6 +39,9 @@ public class RedisCacheService {
             while (cursor.hasNext()) {
                 keys.add(cursor.next());
             }
+        } catch (Exception exception) {
+            logRedisFailure("SCAN", pattern, exception);
+            throw exception;
         }
 
         if (keys.isEmpty()) {
@@ -40,12 +49,31 @@ public class RedisCacheService {
             return;
         }
 
-        redisTemplate.delete(keys);
+        try {
+            redisTemplate.delete(keys);
+        } catch (Exception exception) {
+            logRedisFailure("DELETE", pattern, exception);
+            throw exception;
+        }
 
         log.info(
                 "Redis CACHE INVALIDATION: deleted {} keys for group {}",
                 keys.size(),
                 groupId
         );
+    }
+
+    private void logRedisFailure(String operation, String keyOrPattern, Exception exception) {
+        log.error(
+                "Redis operation failed operation={} keyOrPattern={} exception={}",
+                operation,
+                keyOrPattern,
+                ExceptionLogUtils.describe(exception)
+        );
+
+        Throwable rootCause = ExceptionLogUtils.rootCause(exception);
+        if (rootCause != null && rootCause != exception) {
+            log.error("Redis root cause: {}", ExceptionLogUtils.describe(rootCause));
+        }
     }
 }

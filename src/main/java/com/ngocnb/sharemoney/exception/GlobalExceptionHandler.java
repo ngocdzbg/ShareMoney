@@ -1,6 +1,8 @@
 package com.ngocnb.sharemoney.exception;
 
 import com.ngocnb.sharemoney.dto.response.ErrorResponse;
+import com.ngocnb.sharemoney.observability.ExceptionLogUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.persistence.OptimisticLockException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -10,7 +12,6 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.context.request.WebRequest;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -23,12 +24,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFoundException(
             ResourceNotFoundException exception,
-            WebRequest request
+            HttpServletRequest request
     ) {
         log.warn(
-                "Resource not found at {}: {}",
+                "{} {} failed: {}",
+                request.getMethod(),
                 getPath(request),
-                exception.getMessage()
+                ExceptionLogUtils.describe(exception)
         );
 
         ErrorResponse errorResponse = ErrorResponse.builder()
@@ -45,7 +47,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(
             MethodArgumentNotValidException exception,
-            WebRequest request
+            HttpServletRequest request
     ) {
         Map<String, String> validationErrors = new HashMap<>();
 
@@ -57,7 +59,8 @@ public class GlobalExceptionHandler {
         });
 
         log.warn(
-                "Validation failed at {}: {}",
+                "{} {} validation failed: {}",
+                request.getMethod(),
                 getPath(request),
                 validationErrors
         );
@@ -80,12 +83,13 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ErrorResponse> handleOptimisticLock(
             Exception exception,
-            WebRequest request
+            HttpServletRequest request
     ) {
         log.warn(
-                "Optimistic lock conflict at {}: {}",
+                "{} {} optimistic lock conflict: {}",
+                request.getMethod(),
                 getPath(request),
-                exception.getMessage()
+                ExceptionLogUtils.describe(exception)
         );
 
         ErrorResponse errorResponse = ErrorResponse.builder()
@@ -103,13 +107,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(
             Exception exception,
-            WebRequest request
+            HttpServletRequest request
     ) {
+        Throwable rootCause = ExceptionLogUtils.rootCause(exception);
+
         log.error(
-                "Unhandled exception at {}",
+                "{} {} failed: {}",
+                request.getMethod(),
                 getPath(request),
-                exception
+                ExceptionLogUtils.describe(exception)
         );
+        if (rootCause != null && rootCause != exception) {
+            log.error("Root cause: {}", ExceptionLogUtils.describe(rootCause));
+        }
+        log.error("Stack trace:\n{}", ExceptionLogUtils.stackTrace(exception));
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
@@ -123,7 +134,7 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    private String getPath(WebRequest request) {
-        return request.getDescription(false).replace("uri=", "");
+    private String getPath(HttpServletRequest request) {
+        return request.getRequestURI();
     }
 }

@@ -1,5 +1,7 @@
 package com.ngocnb.sharemoney.config;
 
+import com.ngocnb.sharemoney.observability.ExceptionLogUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -11,6 +13,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
         name = "app.redis.enabled",
         havingValue = "true"
 )
+@Slf4j
 public class RedisConfig {
 
     @Bean
@@ -18,22 +21,33 @@ public class RedisConfig {
             RedisConnectionFactory redisConnectionFactory
     ) {
         return args -> {
-            System.out.println("=================================");
-            System.out.println("REDIS FACTORY");
-            System.out.println(redisConnectionFactory.getClass().getName());
-
-            var connection = redisConnectionFactory.getConnection();
-
             try {
-                System.out.println("CONNECTION");
-                System.out.println(connection);
-                System.out.println("PING: " + connection.ping());
-                System.out.println("DB SIZE: " + connection.serverCommands().dbSize());
-            } finally {
-                connection.close();
-            }
+                log.info(
+                        "Redis startup check started connectionFactory={}",
+                        redisConnectionFactory.getClass().getName()
+                );
 
-            System.out.println("=================================");
+                var connection = redisConnectionFactory.getConnection();
+
+                try {
+                    log.info("Redis startup check ping={}", connection.ping());
+                    log.info("Redis startup check dbSize={}", connection.serverCommands().dbSize());
+                } finally {
+                    connection.close();
+                }
+            } catch (Exception exception) {
+                log.error(
+                        "Redis startup check failed: {}",
+                        ExceptionLogUtils.describe(exception)
+                );
+
+                Throwable rootCause = ExceptionLogUtils.rootCause(exception);
+                if (rootCause != null && rootCause != exception) {
+                    log.error("Redis startup root cause: {}", ExceptionLogUtils.describe(rootCause));
+                }
+
+                throw exception;
+            }
         };
     }
 }

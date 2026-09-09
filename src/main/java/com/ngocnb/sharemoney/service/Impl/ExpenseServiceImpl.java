@@ -13,6 +13,7 @@ import com.ngocnb.sharemoney.event.ExpenseEvent;
 import com.ngocnb.sharemoney.event.ExpenseEventType;
 import com.ngocnb.sharemoney.exception.BadRequestException;
 import com.ngocnb.sharemoney.exception.ResourceNotFoundException;
+import com.ngocnb.sharemoney.observability.ExceptionLogUtils;
 import com.ngocnb.sharemoney.repository.ExpenseRepository;
 import com.ngocnb.sharemoney.repository.GroupMemberRepository;
 import com.ngocnb.sharemoney.repository.GroupNameRepository;
@@ -76,9 +77,11 @@ public class ExpenseServiceImpl implements ExpenseService {
         try {
             String json = objectMapper.writeValueAsString(cache);
 
-            log.info("========== REDIS DEBUG ==========");
-            log.info("KEY: {}", cacheKey);
-            log.info("JSON LENGTH: {}", json.length());
+            log.info(
+                    "Redis operation started service=ExpenseServiceImpl.saveExpenseCache operation=SET key={} payloadBytes={}",
+                    cacheKey,
+                    json.length()
+            );
 
             redisTemplate.opsForValue().set(
                     cacheKey,
@@ -86,34 +89,13 @@ public class ExpenseServiceImpl implements ExpenseService {
                     Duration.ofMinutes(10)
             );
 
-            String value =
-                    redisTemplate.opsForValue().get(cacheKey);
-
-            log.info("READ AFTER WRITE: {}", value != null);
             log.info(
-                    "READ VALUE LENGTH: {}",
-                    value != null ? value.length() : 0
+                    "Redis operation completed service=ExpenseServiceImpl.saveExpenseCache operation=SET key={}",
+                    cacheKey
             );
-
-            Boolean exists =
-                    redisTemplate.hasKey(cacheKey);
-
-            log.info("HAS KEY: {}", exists);
-
-            Long ttl =
-                    redisTemplate.getExpire(cacheKey);
-
-            log.info("TTL: {} seconds", ttl);
-
-            log.info("================================");
 
         } catch (Exception e) {
-
-            log.error(
-                    "REDIS SAVE FAILED: {}",
-                    cacheKey,
-                    e
-            );
+            logRedisFailure("ExpenseServiceImpl.saveExpenseCache", "SET", cacheKey, e);
 
             throw new RuntimeException(
                     "Failed to save expense cache",
@@ -261,8 +243,12 @@ public class ExpenseServiceImpl implements ExpenseService {
     ) {
 
         log.info(
-                "Service: Fetching expenses for group ID: {}",
-                groupId
+                "Service ExpenseServiceImpl.getExpensesByGroupId started groupId={} page={} size={} sortBy={} direction={}",
+                groupId,
+                page,
+                size,
+                sortBy,
+                direction
         );
 
         if (!groupNameRepository.existsById(groupId)) {
@@ -299,9 +285,19 @@ public class ExpenseServiceImpl implements ExpenseService {
          * ==========================================
          */
 
-        String cachedJson = redisTemplate
-                .opsForValue()
-                .get(cacheKey);
+        String cachedJson;
+        try {
+            log.info(
+                    "Redis operation started service=ExpenseServiceImpl.getExpensesByGroupId operation=GET key={}",
+                    cacheKey
+            );
+            cachedJson = redisTemplate
+                    .opsForValue()
+                    .get(cacheKey);
+        } catch (Exception exception) {
+            logRedisFailure("ExpenseServiceImpl.getExpensesByGroupId", "GET", cacheKey, exception);
+            throw exception;
+        }
 
         if (cachedJson != null) {
 
@@ -324,7 +320,17 @@ public class ExpenseServiceImpl implements ExpenseService {
                         e
                 );
 
-                redisTemplate.delete(cacheKey);
+                try {
+                    redisTemplate.delete(cacheKey);
+                } catch (Exception deleteException) {
+                    logRedisFailure(
+                            "ExpenseServiceImpl.getExpensesByGroupId",
+                            "DELETE_CORRUPT_CACHE",
+                            cacheKey,
+                            deleteException
+                    );
+                    throw deleteException;
+                }
 
                 cached = null;
             }
@@ -853,6 +859,26 @@ public class ExpenseServiceImpl implements ExpenseService {
                 "expense-events",
                 payload
         );
+    }
+
+    private void logRedisFailure(
+            String serviceMethod,
+            String operation,
+            String key,
+            Exception exception
+    ) {
+        log.error(
+                "Redis operation failed service={} operation={} key={} exception={}",
+                serviceMethod,
+                operation,
+                key,
+                ExceptionLogUtils.describe(exception)
+        );
+
+        Throwable rootCause = ExceptionLogUtils.rootCause(exception);
+        if (rootCause != null && rootCause != exception) {
+            log.error("Redis root cause: {}", ExceptionLogUtils.describe(rootCause));
+        }
     }
 
     /**
