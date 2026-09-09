@@ -3,14 +3,10 @@ package com.ngocnb.sharemoney.service;
 import com.ngocnb.sharemoney.observability.ExceptionLogUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.Cursor;
-import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -19,6 +15,7 @@ import java.util.Optional;
 public class RedisCacheService {
 
     private final StringRedisTemplate redisTemplate;
+    private static final long DEFAULT_EXPENSE_GROUP_CACHE_VERSION = 0L;
 
     public Optional<String> getSafely(String key) {
         try {
@@ -32,6 +29,55 @@ public class RedisCacheService {
                     rootCauseDescription(exception)
             );
             return Optional.empty();
+        }
+    }
+
+    public Optional<Long> getExpenseGroupVersionSafely(Long groupId) {
+        String key = buildExpenseGroupVersionKey(groupId);
+
+        try {
+            String value = redisTemplate.opsForValue().get(key);
+            if (value == null || value.isBlank()) {
+                return Optional.of(DEFAULT_EXPENSE_GROUP_CACHE_VERSION);
+            }
+
+            return Optional.of(Long.parseLong(value));
+        } catch (NumberFormatException exception) {
+            log.warn(
+                    "Invalid Redis cache version, fallback to database. operation=GET_VERSION groupId={} rootCause={}",
+                    groupId,
+                    rootCauseDescription(exception)
+            );
+            deleteSafely(key);
+            return Optional.empty();
+        } catch (Exception exception) {
+            log.warn(
+                    "Redis unavailable, fallback to database. operation=GET_VERSION groupId={} rootCause={}",
+                    groupId,
+                    rootCauseDescription(exception)
+            );
+            return Optional.empty();
+        }
+    }
+
+    public boolean incrementExpenseGroupVersionSafely(Long groupId) {
+        String key = buildExpenseGroupVersionKey(groupId);
+
+        try {
+            Long version = redisTemplate.opsForValue().increment(key);
+            log.info(
+                    "Redis cache version incremented operation=INCR groupId={} version={}",
+                    groupId,
+                    version
+            );
+            return true;
+        } catch (Exception exception) {
+            log.warn(
+                    "Redis unavailable, skip cache invalidation. operation=INCR_VERSION groupId={} rootCause={}",
+                    groupId,
+                    rootCauseDescription(exception)
+            );
+            return false;
         }
     }
 
@@ -65,62 +111,20 @@ public class RedisCacheService {
         }
     }
 
+    public void invalidateExpenseCacheByGroupId(Long groupId) {
+        incrementExpenseGroupVersionSafely(groupId);
+    }
+
     public void deleteExpenseCacheByGroupId(Long groupId) {
-
-        String pattern = "expenses:group:" + groupId + ":*";
-        log.info(
-                "Service RedisCacheService.deleteExpenseCacheByGroupId started groupId={} operation=SCAN pattern={}",
-                groupId,
-                pattern
-        );
-
-        ScanOptions options = ScanOptions.scanOptions()
-                .match(pattern)
-                .count(100)
-                .build();
-
-        List<String> keys = new ArrayList<>();
-
-        try (Cursor<String> cursor = redisTemplate.scan(options)) {
-
-            while (cursor.hasNext()) {
-                keys.add(cursor.next());
-            }
-        } catch (Exception exception) {
-            log.warn(
-                    "Redis unavailable, skip cache invalidation. operation=SCAN groupId={} rootCause={}",
-                    groupId,
-                    rootCauseDescription(exception)
-            );
-            return;
-        }
-
-        if (keys.isEmpty()) {
-            log.info("Redis CACHE INVALIDATION: no keys found for group {}", groupId);
-            return;
-        }
-
-        try {
-            redisTemplate.delete(keys);
-        } catch (Exception exception) {
-            log.warn(
-                    "Redis unavailable, skip cache invalidation. operation=DELETE groupId={} keyCount={} rootCause={}",
-                    groupId,
-                    keys.size(),
-                    rootCauseDescription(exception)
-            );
-            return;
-        }
-
-        log.info(
-                "Redis CACHE INVALIDATION: deleted {} keys for group {}",
-                keys.size(),
-                groupId
-        );
+        invalidateExpenseCacheByGroupId(groupId);
     }
 
     private String rootCauseDescription(Exception exception) {
         Throwable rootCause = ExceptionLogUtils.rootCause(exception);
         return ExceptionLogUtils.describe(rootCause != null ? rootCause : exception);
+    }
+
+    private String buildExpenseGroupVersionKey(Long groupId) {
+        return "expenses:group:" + groupId + ":version";
     }
 }

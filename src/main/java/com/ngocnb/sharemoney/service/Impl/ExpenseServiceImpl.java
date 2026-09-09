@@ -53,14 +53,16 @@ public class ExpenseServiceImpl implements ExpenseService {
 
     private String buildExpenseListCacheKey(
             Long groupId,
+            Long cacheVersion,
             int page,
             int size,
             String sortBy,
             String direction
     ) {
         return String.format(
-                "expenses:group:%d:page:%d:size:%d:sort:%s:%s",
+                "expenses:group:%d:v:%d:page:%d:size:%d:sort:%s:%s",
                 groupId,
+                cacheVersion,
                 page,
                 size,
                 sortBy,
@@ -241,13 +243,19 @@ public class ExpenseServiceImpl implements ExpenseService {
                 sort
         );
 
-        String cacheKey = buildExpenseListCacheKey(
-                groupId,
-                page,
-                safeSize,
-                sortBy,
-                direction
-        );
+        Optional<Long> cacheVersion =
+                redisCacheService.getExpenseGroupVersionSafely(groupId);
+
+        String cacheKey = cacheVersion
+                .map(version -> buildExpenseListCacheKey(
+                        groupId,
+                        version,
+                        page,
+                        safeSize,
+                        sortBy,
+                        direction
+                ))
+                .orElse(null);
 
         /*
          * ==========================================
@@ -255,7 +263,9 @@ public class ExpenseServiceImpl implements ExpenseService {
          * ==========================================
          */
 
-        Optional<String> cachedJson = redisCacheService.getSafely(cacheKey);
+        Optional<String> cachedJson = cacheKey == null
+                ? Optional.empty()
+                : redisCacheService.getSafely(cacheKey);
 
         if (cachedJson.isPresent()) {
 
@@ -316,10 +326,12 @@ public class ExpenseServiceImpl implements ExpenseService {
                             false
                     );
 
-            saveExpenseCache(
-                    cacheKey,
-                    emptyCache
-            );
+            if (cacheKey != null) {
+                saveExpenseCache(
+                        cacheKey,
+                        emptyCache
+                );
+            }
 
             return new SliceImpl<>(
                     List.of(),
@@ -379,10 +391,12 @@ public class ExpenseServiceImpl implements ExpenseService {
                         expenseSlice.hasNext()
                 );
 
-        saveExpenseCache(
-                cacheKey,
-                cache
-        );
+        if (cacheKey != null) {
+            saveExpenseCache(
+                    cacheKey,
+                    cache
+            );
+        }
 
         /*
          * ==========================================
@@ -809,14 +823,14 @@ public class ExpenseServiceImpl implements ExpenseService {
 
     private void invalidateExpenseCacheAfterCommit(Long groupId) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            redisCacheService.deleteExpenseCacheByGroupId(groupId);
+            redisCacheService.invalidateExpenseCacheByGroupId(groupId);
             return;
         }
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                redisCacheService.deleteExpenseCacheByGroupId(groupId);
+                redisCacheService.invalidateExpenseCacheByGroupId(groupId);
             }
         });
     }
