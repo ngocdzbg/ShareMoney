@@ -223,7 +223,8 @@ public class SecurityConfig {
                 "http://localhost:3000",
                 "http://localhost:5173",   // React
                 "http://localhost:8080",   // Vue
-                "http://localhost:4200"    // Angular
+                "http://localhost:4200",    // Angular
+                "https://share-money-fe.vercel.app"
         ));
 
         // Các phương thức HTTP được phép
