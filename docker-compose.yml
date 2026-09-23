@@ -9,8 +9,8 @@ services:
     restart: unless-stopped
 
     environment:
-      MYSQL_ROOT_PASSWORD: 123456
-      MYSQL_DATABASE: apifirst
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD for MySQL}
+      MYSQL_DATABASE: share_money
 
     ports:
       - "3307:3306"
@@ -19,7 +19,7 @@ services:
       - mysql_data:/var/lib/mysql
 
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-p123456" ]
+      test: [ "CMD-SHELL", 'MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin ping -h localhost --silent' ]
       interval: 10s
       timeout: 5s
       retries: 10

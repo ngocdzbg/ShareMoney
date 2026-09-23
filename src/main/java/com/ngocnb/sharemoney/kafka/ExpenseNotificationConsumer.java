@@ -5,10 +5,12 @@ import com.ngocnb.sharemoney.idempotency.IdempotentEventProcessor;
 import com.ngocnb.sharemoney.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class ExpenseNotificationConsumer {

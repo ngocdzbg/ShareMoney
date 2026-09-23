@@ -1,6 +1,6 @@
 package com.ngocnb.sharemoney.controller;
 
-import com.ngocnb.sharemoney.service.RedisCacheService;
+import com.ngocnb.sharemoney.service.CacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,12 +13,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RedisTestController {
 
-    private final RedisCacheService redisCacheService;
+    private final CacheService cacheService;
 
     @PostMapping("/test")
     public ResponseEntity<Map<String, Object>> set() {
 
-        boolean saved = redisCacheService.setSafely(
+        boolean saved = cacheService.setSafely(
                 "test:key",
                 "Hello Redis",
                 Duration.ofMinutes(5)
@@ -33,7 +33,7 @@ public class RedisTestController {
     @GetMapping("/test")
     public ResponseEntity<Map<String, Object>> get() {
 
-        return redisCacheService.getSafely("test:key")
+        return cacheService.getSafely("test:key")
                 .<ResponseEntity<Map<String, Object>>>map(value -> ResponseEntity.ok(Map.of(
                         "redisAvailable", true,
                         "cacheHit", true,

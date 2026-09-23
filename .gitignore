@@ -9,8 +9,11 @@ target/
 .env.*
 application-secret.properties
 
-# Keep local config private
-src/main/resources/application-local.properties
+# application-local.properties is shared and must contain no literal secrets.
+# Private configuration and IntelliJ run configurations stay on the developer machine.
+application-secret.yml
+application-secret.yaml
+.run/
 
 # Cho phép đẩy file mẫu (nếu có)
 !**/src/main/resources/application.properties.example

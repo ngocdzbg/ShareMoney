@@ -3,6 +3,8 @@ package com.ngocnb.sharemoney.service;
 import com.ngocnb.sharemoney.observability.ExceptionLogUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -10,9 +12,10 @@ import java.time.Duration;
 import java.util.Optional;
 
 @Service
+@ConditionalOnProperty(name = "app.redis.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
-public class RedisCacheService {
+public class RedisCacheService implements CacheService {
 
     private final StringRedisTemplate redisTemplate;
     private static final long DEFAULT_EXPENSE_GROUP_CACHE_VERSION = 0L;
@@ -22,7 +25,7 @@ public class RedisCacheService {
             log.info("Redis cache read started operation=GET key={}", key);
             String value = redisTemplate.opsForValue().get(key);
             return Optional.ofNullable(value);
-        } catch (Exception exception) {
+        } catch (DataAccessException exception) {
             log.warn(
                     "Redis unavailable, fallback to database. operation=GET key={} rootCause={}",
                     key,
@@ -50,7 +53,7 @@ public class RedisCacheService {
             );
             deleteSafely(key);
             return Optional.empty();
-        } catch (Exception exception) {
+        } catch (DataAccessException exception) {
             log.warn(
                     "Redis unavailable, fallback to database. operation=GET_VERSION groupId={} rootCause={}",
                     groupId,
@@ -71,7 +74,7 @@ public class RedisCacheService {
                     version
             );
             return true;
-        } catch (Exception exception) {
+        } catch (DataAccessException exception) {
             log.warn(
                     "Redis unavailable, skip cache invalidation. operation=INCR_VERSION groupId={} rootCause={}",
                     groupId,
@@ -86,7 +89,7 @@ public class RedisCacheService {
             redisTemplate.opsForValue().set(key, value, ttl);
             log.info("Redis cache write completed operation=SET key={} ttl={}", key, ttl);
             return true;
-        } catch (Exception exception) {
+        } catch (DataAccessException exception) {
             log.warn(
                     "Redis unavailable, skip cache write. operation=SET key={} rootCause={}",
                     key,
@@ -101,7 +104,7 @@ public class RedisCacheService {
             redisTemplate.delete(key);
             log.info("Redis cache delete completed operation=DELETE key={}", key);
             return true;
-        } catch (Exception exception) {
+        } catch (DataAccessException exception) {
             log.warn(
                     "Redis unavailable, skip cache delete. operation=DELETE key={} rootCause={}",
                     key,

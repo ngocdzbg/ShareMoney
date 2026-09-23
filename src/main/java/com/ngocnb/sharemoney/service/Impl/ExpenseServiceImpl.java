@@ -18,7 +18,7 @@ import com.ngocnb.sharemoney.repository.GroupMemberRepository;
 import com.ngocnb.sharemoney.repository.GroupNameRepository;
 import com.ngocnb.sharemoney.service.ExpenseService;
 import com.ngocnb.sharemoney.outbox.OutboxService;
-import com.ngocnb.sharemoney.service.RedisCacheService;
+import com.ngocnb.sharemoney.service.CacheService;
 import jakarta.persistence.OptimisticLockException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +47,7 @@ public class ExpenseServiceImpl implements ExpenseService {
     private final GroupMemberRepository groupMemberRepository;
 
     private final ObjectMapper objectMapper;
-    private final RedisCacheService redisCacheService;
+    private final CacheService cacheService;
 
     private final OutboxService outboxService;
 
@@ -87,7 +87,7 @@ public class ExpenseServiceImpl implements ExpenseService {
             return;
         }
 
-        redisCacheService.setSafely(
+        cacheService.setSafely(
                 cacheKey,
                 json,
                 Duration.ofMinutes(10)
@@ -244,7 +244,7 @@ public class ExpenseServiceImpl implements ExpenseService {
         );
 
         Optional<Long> cacheVersion =
-                redisCacheService.getExpenseGroupVersionSafely(groupId);
+                cacheService.getExpenseGroupVersionSafely(groupId);
 
         String cacheKey = cacheVersion
                 .map(version -> buildExpenseListCacheKey(
@@ -265,7 +265,7 @@ public class ExpenseServiceImpl implements ExpenseService {
 
         Optional<String> cachedJson = cacheKey == null
                 ? Optional.empty()
-                : redisCacheService.getSafely(cacheKey);
+                : cacheService.getSafely(cacheKey);
 
         if (cachedJson.isPresent()) {
 
@@ -288,7 +288,7 @@ public class ExpenseServiceImpl implements ExpenseService {
                         e
                 );
 
-                redisCacheService.deleteSafely(cacheKey);
+                cacheService.deleteSafely(cacheKey);
                 cached = null;
             }
 
@@ -823,14 +823,14 @@ public class ExpenseServiceImpl implements ExpenseService {
 
     private void invalidateExpenseCacheAfterCommit(Long groupId) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            redisCacheService.invalidateExpenseCacheByGroupId(groupId);
+            cacheService.invalidateExpenseCacheByGroupId(groupId);
             return;
         }
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                redisCacheService.invalidateExpenseCacheByGroupId(groupId);
+                cacheService.invalidateExpenseCacheByGroupId(groupId);
             }
         });
     }
